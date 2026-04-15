@@ -1,12 +1,32 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone, tzinfo
 import os
 from typing import Any
 from zoneinfo import ZoneInfo
 
 import requests
+
+
+class LocalMeanTime(tzinfo):
+    """Custom Timezone object to handle Local Mean Time (LMT) based on longitude."""
+
+    def __init__(self, longitude: float, label: str = "LMT") -> None:
+        self.longitude = longitude
+        self.label = label
+        # Longitude 1 degree = 4 minutes of time (360 degrees = 1440 minutes)
+        self.offset_seconds = int(round(longitude * 240))
+        self._utcoffset = timedelta(seconds=self.offset_seconds)
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        return self._utcoffset
+
+    def tzname(self, dt: datetime | None) -> str:
+        return self.label
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        return timedelta(0)
 
 
 class LocationResolutionError(ValueError):
@@ -34,6 +54,7 @@ class ResolvedBirthData:
     place: ResolvedPlace
     local_datetime: datetime
     utc_datetime: datetime
+    is_lmt: bool = False
 
 
 class GeocodingService:
@@ -118,13 +139,35 @@ class GeocodingService:
         birth_timestamp = int(provisional_utc.timestamp())
 
         place = self.resolve_place(place_input, birth_timestamp=birth_timestamp)
-        local_tz = ZoneInfo(place.timezone)
+
+        # --- Professional Grade Historical Override Logic ---
+        # We check for regions where IANA (Asia/Kolkata) is generalized
+        # Specifically pre-1955 India and pre-standardization Global periods.
         
+        target_tz: tzinfo = ZoneInfo(place.timezone)
+        is_lmt = False
+        
+        # India logic
+        is_india = "india" in place.label.lower()
+        if is_india:
+            # 1. Pre-1906: No national standard; force Pure Longitudinal LMT
+            if dob.year < 1906:
+                target_tz = LocalMeanTime(place.lon, label="LMT")
+                is_lmt = True
+            # 2. Mumbai (Bombay) Municipal Time (+4:51) used until 1955
+            elif dob.year < 1955 and ("mumbai" in place.label.lower() or "bombay" in place.label.lower()):
+                target_tz = LocalMeanTime(72.8777, label="Bombay Time")
+                is_lmt = True
+            # 3. Kolkata (Calcutta) Municipal Time (+5:54) used until 1948
+            elif dob.year < 1948 and ("kolkata" in place.label.lower() or "calcutta" in place.label.lower()):
+                target_tz = LocalMeanTime(88.3639, label="Calcutta Time")
+                is_lmt = True
+
         # combine() doesn't take fold in Python 3.9; use replace() instead.
         # This handles the second occurrence of a repeated hour (switch-backs).
-        local_datetime = datetime.combine(dob, birth_time, tzinfo=local_tz).replace(fold=1)
+        local_datetime = datetime.combine(dob, birth_time, tzinfo=target_tz).replace(fold=1)
         utc_datetime = local_datetime.astimezone(timezone.utc)
-        
+
         return ResolvedBirthData(
             name=(name or "").strip() or None,
             dob=dob,
@@ -133,6 +176,7 @@ class GeocodingService:
             place=place,
             local_datetime=local_datetime,
             utc_datetime=utc_datetime,
+            is_lmt=is_lmt,
         )
 
     def _normalize_time_accuracy(self, time_value: str | None, time_accuracy: str | None) -> str:

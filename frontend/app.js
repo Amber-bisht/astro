@@ -206,11 +206,17 @@ function renderCompatibility(data) {
   elements.metaSummaryGrid.classList.remove("hidden");
   elements.boyMetaText.innerHTML = `
     ${escapeHtml(data.boy_meta.label)}<br>
-    <small>${data.boy_meta.lat.toFixed(4)}N, ${data.boy_meta.lon.toFixed(4)}E | ${escapeHtml(data.boy_meta.timezone)}</small>
+    <small>
+      ${data.boy_meta.lat.toFixed(4)}N, ${data.boy_meta.lon.toFixed(4)}E | ${escapeHtml(data.boy_meta.timezone)}
+      ${data.boy_meta.is_lmt ? ' | <span class="pill" style="font-size:0.6rem;padding:2px 6px">LMT</span>' : ''}
+    </small>
   `;
   elements.girlMetaText.innerHTML = `
     ${escapeHtml(data.girl_meta.label)}<br>
-    <small>${data.girl_meta.lat.toFixed(4)}N, ${data.girl_meta.lon.toFixed(4)}E | ${escapeHtml(data.girl_meta.timezone)}</small>
+    <small>
+      ${data.girl_meta.lat.toFixed(4)}N, ${data.girl_meta.lon.toFixed(4)}E | ${escapeHtml(data.girl_meta.timezone)}
+      ${data.girl_meta.is_lmt ? ' | <span class="pill" style="font-size:0.6rem;padding:2px 6px">LMT</span>' : ''}
+    </small>
   `;
 
   // Render Detailed Table
@@ -274,7 +280,10 @@ function renderPersonResult(person, chart) {
           <p class="eyebrow">${capitalize(person)} Chart</p>
           <h3>${escapeHtml(chart.meta.place_name || capitalize(person))}</h3>
         </div>
-        <span class="pill">${escapeHtml(chart.meta.time_accuracy)}</span>
+        <div style="display:flex; gap:8px;">
+          <span class="pill">${escapeHtml(chart.meta.time_accuracy)}</span>
+          ${chart.meta.is_lmt ? '<span class="pill" style="background:rgba(187,108,47,0.15); border-color:var(--warning); color:var(--warning);">LMT</span>' : ""}
+        </div>
       </div>
 
       <div class="summary-grid">

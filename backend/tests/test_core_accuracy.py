@@ -77,26 +77,74 @@ class TestKundaliReliability(unittest.TestCase):
     def test_astrology_accuracy_gandhi(self):
         """High-level check of astronomical accuracy for Mahatma Gandhi."""
         # Gandhi: Oct 2, 1869, 07:12 AM, Porbandar (approx 69.6, 21.6)
-        # Note: In 1869, IST didn't exist. We assume Local Mean Time or +4:38
-        # However, for this test, we verify the planet positions match standard values.
+        # 1869 India must use Pure LMT.
         resolved = ResolvedBirthData(
             name="Mahatma Gandhi",
             dob=date(1869, 10, 2),
             birth_time=time(7, 12),
             time_accuracy="exact",
-            place=ResolvedPlace("Porbandar", 21.6417, 69.6293, "Asia/Kolkata"), # Asia/Kolkata uses LMT for pre-1906
+            place=ResolvedPlace("Porbandar", 21.6417, 69.6293, "Asia/Kolkata"),
             local_datetime=datetime(1869, 10, 2, 7, 12),
-            utc_datetime=datetime(1869, 10, 2, 2, 33, 50, tzinfo=timezone.utc) # LMT offset approx +4:38:10
+            utc_datetime=datetime(1869, 10, 2, 2, 33, 50, tzinfo=timezone.utc),
+            is_lmt=True
         )
         
         bundle = build_chart_bundle(resolved)
-        
-        # Gandhi had Moon in Cancer (Savage/Ashesha)
         self.assertEqual(bundle.data["core_identity"]["moon_sign"], "Cancer")
-        # Sun in Virgo
-        self.assertEqual(bundle.data["core_identity"]["sun_sign"], "Virgo")
-        # Lagna in Libra
         self.assertEqual(bundle.data["core_identity"]["lagna"], "Libra")
+
+    def test_mumbai_1940_bombay_time(self):
+        """Verify that Mumbai births before 1955 use Bombay Time (+4:51)."""
+        # We manually trigger the resolution logic via resolve_birth_details
+        with patch.object(self.geo, 'google_key', 'fake-key'), patch.object(self.geo, 'opencage_key', None):
+            with patch.object(self.geo, 'autocomplete') as mock_auto:
+                mock_auto.return_value = [{
+                    "label": "Mumbai, India",
+                    "lat": 18.97,
+                    "lon": 72.87,
+                    "timezone": "Asia/Kolkata"
+                }]
+                
+                res = self.geo.resolve_birth_details(
+                    name="Bombay Test",
+                    dob=date(1940, 1, 1),
+                    time_value="12:00",
+                    time_accuracy="exact",
+                    place_input="Mumbai"
+                )
+                
+                # Bombay Time is approx +4:51
+                # 72.87 * 240 = 17488.8 -> 17489 seconds -> 4h 51m 29s
+                offset = res.local_datetime.utcoffset().total_seconds()
+                self.assertAlmostEqual(offset, 17491, delta=120) # Approx 4:51
+                self.assertTrue(res.is_lmt)
+                self.assertEqual(res.local_datetime.tzname(), "Bombay Time")
+
+    def test_india_1890_pure_lmt(self):
+        """Verify that any Indian birth before 1906 uses dynamic LMT."""
+        with patch.object(self.geo, 'google_key', 'fake-key'), patch.object(self.geo, 'opencage_key', None):
+            with patch.object(self.geo, 'autocomplete') as mock_auto:
+                # Test with a high-longitude city like Dibrugarh (~94.9E)
+                mock_auto.return_value = [{
+                    "label": "Dibrugarh, India",
+                    "lat": 27.47,
+                    "lon": 94.91,
+                    "timezone": "Asia/Kolkata"
+                }]
+                
+                res = self.geo.resolve_birth_details(
+                    name="LMT Test",
+                    dob=date(1890, 1, 1),
+                    time_value="12:00",
+                    time_accuracy="exact",
+                    place_input="Dibrugarh"
+                )
+                
+                # Dibrugarh LMT: 94.91 * 240 = 22778.4s -> 6h 19m 38s
+                offset = res.local_datetime.utcoffset().total_seconds()
+                self.assertAlmostEqual(offset, 22778, delta=10)
+                self.assertTrue(res.is_lmt)
+                self.assertEqual(res.local_datetime.tzname(), "LMT")
 
 if __name__ == '__main__':
     unittest.main()

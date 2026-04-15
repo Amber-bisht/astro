@@ -156,14 +156,16 @@ async def guna_milan(payload: CompatibilityRequest) -> dict:
     response["boy_meta"] = {
         "lat": boy_resolved.place.lat,
         "lon": boy_resolved.place.lon,
-        "timezone": boy_resolved.place.timezone,
+        "timezone": boy_resolved.local_datetime.tzname(),
         "label": boy_resolved.place.label,
+        "is_lmt": boy_resolved.is_lmt,
     }
     response["girl_meta"] = {
         "lat": girl_resolved.place.lat,
         "lon": girl_resolved.place.lon,
-        "timezone": girl_resolved.place.timezone,
+        "timezone": girl_resolved.local_datetime.tzname(),
         "label": girl_resolved.place.label,
+        "is_lmt": girl_resolved.is_lmt,
     }
 
     warnings = _warnings_for_people(boy_chart, girl_chart)

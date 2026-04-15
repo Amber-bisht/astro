@@ -430,6 +430,7 @@ def build_chart_bundle(resolved_birth: ResolvedBirthData) -> ChartBundle:
             "place_name": resolved_birth.place.label,
             "local_datetime": resolved_birth.local_datetime.isoformat(),
             "utc_datetime": resolved_birth.utc_datetime.isoformat(),
+            "is_lmt": resolved_birth.is_lmt,
             "warnings": warnings,
         },
         "core_identity": {
