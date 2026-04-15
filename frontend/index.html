@@ -135,6 +135,25 @@
           <pre id="json-output"></pre>
         </div>
       </section>
+
+      <section id="ai-prompts-panel" class="card hidden">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">🤖 AI Analysis Prompts</p>
+            <h2>Copy &amp; Paste into ChatGPT</h2>
+          </div>
+          <span class="pill">6 Categories</span>
+        </div>
+        <p class="muted" style="margin-bottom:1rem;font-size:0.9rem;">Click any card below to preview the prompt, then copy it to your clipboard.</p>
+        <div id="prompt-cards-grid" class="prompt-grid"></div>
+        <div id="prompt-preview-container" class="prompt-preview-container hidden">
+          <div class="prompt-preview-header">
+            <h3 id="prompt-preview-title">Preview</h3>
+            <button id="prompt-copy-btn" class="primary" style="padding:0.4rem 1rem;font-size:0.85rem;">📋 Copy Prompt</button>
+          </div>
+          <pre id="prompt-preview-text" class="prompt-preview-text"></pre>
+        </div>
+      </section>
     </main>
 
     <script src="/assets/app.js" defer></script>

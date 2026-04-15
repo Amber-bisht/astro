@@ -184,7 +184,15 @@ async def full_data(payload: CompatibilityRequest) -> dict:
                 data["gender"] = gender
                 await db.profiles.update_one({"name": person.name}, {"$set": data}, upsert=True)
 
-    return build_pair_charts(boy_resolved, girl_resolved)
+    charts = build_pair_charts(boy_resolved, girl_resolved)
+
+    # Include Guna Milan so AI prompts have everything in one response
+    boy_chart = build_chart_bundle(boy_resolved)
+    girl_chart = build_chart_bundle(girl_resolved)
+    guna_milan_result = calculate_guna_milan(boy_chart, girl_chart)
+    charts["guna_milan"] = guna_milan_result
+
+    return charts
 
 
 def _resolve_people(payload: CompatibilityRequest):

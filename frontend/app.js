@@ -23,6 +23,12 @@ const elements = {
   girlMetaText: document.getElementById("girl-meta-text"),
   boyProfileSelect: document.getElementById("boy-profile-select"),
   girlProfileSelect: document.getElementById("girl-profile-select"),
+  aiPromptsPanel: document.getElementById("ai-prompts-panel"),
+  promptCardsGrid: document.getElementById("prompt-cards-grid"),
+  promptPreviewContainer: document.getElementById("prompt-preview-container"),
+  promptPreviewTitle: document.getElementById("prompt-preview-title"),
+  promptPreviewText: document.getElementById("prompt-preview-text"),
+  promptCopyBtn: document.getElementById("prompt-copy-btn"),
 };
 
 const persons = ["boy", "girl"];
@@ -123,6 +129,7 @@ async function handleFullData() {
     const response = await fetchJson("/full-data", payload);
     state.fullData = response;
     renderFullData(response);
+    renderPromptPanel(response);
     elements.copyButton.disabled = false;
     showStatus("Full chart data generated.");
     refreshProfiles(); // Refresh in case new profile was auto-saved
@@ -525,6 +532,575 @@ function renderTransits(transits) {
     `)
     .join("");
 }
+
+// ============================================================
+// AI PROMPT GENERATOR SYSTEM
+// ============================================================
+
+const SYSTEM_PROMPT = `You are an expert Vedic astrologer with 30+ years of experience in marriage compatibility analysis (Kundali Milan). You follow the Parashari system with Lahiri ayanamsa and Whole Sign house system.
+
+RULES:
+1. Use ONLY the provided chart data. Do not assume or invent any planetary positions.
+2. Always consider BOTH natal (D1) and Navamsa (D9) charts together.
+3. Factor in planetary aspects (Drishti) when analyzing any house.
+4. Consider current transits for timing predictions.
+5. Be direct and honest — do not sugarcoat bad combinations.
+6. Rate every analysis section with: ⭐ Excellent / ✅ Good / ⚠️ Average / ❌ Challenging / 🚫 Serious Concern
+7. At the end, give a CLEAR VERDICT using one of these tiers:
+   🟢 BEST MATCH — rare celestial alignment, highly favorable
+   🟡 GOOD MATCH — solid foundation, minor issues manageable
+   🟠 AVERAGE — proceed with awareness, some areas need work
+   🔴 CHALLENGING — serious remedies needed before proceeding
+   ⛔ AVOID — major fundamental incompatibility
+8. If there are doshas, always mention whether cancellation applies and what remedies exist.
+9. Speak in simple language that a non-astrologer can understand, but include the technical reasoning in parentheses.
+10. Structure your response with clear headings, bullet points, and the tier rating for each section.`;
+
+const PROMPT_CATEGORIES = [
+  {
+    id: "marriage",
+    icon: "💍",
+    title: "Marriage Compatibility",
+    desc: "Overall match verdict, strengths & red flags",
+    buildPrompt: buildMarriagePrompt,
+  },
+  {
+    id: "wealth",
+    icon: "💰",
+    title: "Wealth & Finance",
+    desc: "Combined financial outlook post-marriage",
+    buildPrompt: buildWealthPrompt,
+  },
+  {
+    id: "health",
+    icon: "💪",
+    title: "Health & Longevity",
+    desc: "Health risks, Nadi dosha impact",
+    buildPrompt: buildHealthPrompt,
+  },
+  {
+    id: "children",
+    icon: "👶",
+    title: "Children & Family",
+    desc: "Progeny prospects & timing",
+    buildPrompt: buildChildrenPrompt,
+  },
+  {
+    id: "career",
+    icon: "💼",
+    title: "Career & Growth",
+    desc: "Combined career trajectory & support",
+    buildPrompt: buildCareerPrompt,
+  },
+  {
+    id: "verdict",
+    icon: "⚡",
+    title: "Overall Verdict",
+    desc: "Complete proceed / caution / avoid rating",
+    buildPrompt: buildOverallPrompt,
+  },
+];
+
+let activePromptText = "";
+
+function renderPromptPanel(data) {
+  elements.aiPromptsPanel.classList.remove("hidden");
+  elements.promptPreviewContainer.classList.add("hidden");
+  activePromptText = "";
+
+  elements.promptCardsGrid.innerHTML = PROMPT_CATEGORIES.map(
+    (cat) => `
+    <div class="prompt-card" data-prompt-id="${cat.id}">
+      <div class="prompt-card-icon">${cat.icon}</div>
+      <div class="prompt-card-title">${escapeHtml(cat.title)}</div>
+      <div class="prompt-card-desc">${escapeHtml(cat.desc)}</div>
+    </div>
+  `
+  ).join("");
+
+  elements.promptCardsGrid.querySelectorAll(".prompt-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      const category = PROMPT_CATEGORIES.find((c) => c.id === card.dataset.promptId);
+      if (!category) return;
+
+      // Mark active
+      elements.promptCardsGrid.querySelectorAll(".prompt-card").forEach((c) => c.classList.remove("active"));
+      card.classList.add("active");
+
+      // Build and show preview
+      activePromptText = category.buildPrompt(data);
+      elements.promptPreviewTitle.textContent = `${category.icon} ${category.title} Prompt`;
+      elements.promptPreviewText.textContent = activePromptText;
+      elements.promptPreviewContainer.classList.remove("hidden");
+    });
+  });
+
+  elements.promptCopyBtn.addEventListener("click", async () => {
+    if (!activePromptText) return;
+    try {
+      await navigator.clipboard.writeText(activePromptText);
+      const originalText = elements.promptCopyBtn.textContent;
+      elements.promptCopyBtn.textContent = "✓ Copied!";
+      showStatus("Prompt copied to clipboard! Paste into ChatGPT.");
+      setTimeout(() => {
+        elements.promptCopyBtn.textContent = originalText;
+      }, 2000);
+    } catch {
+      showStatus("Clipboard copy failed.", true);
+    }
+  });
+}
+
+// --- Data Extractors ---
+
+function extractCoreIdentity(chart) {
+  return `Lagna: ${chart.core_identity.lagna} (${chart.core_identity.lagna_degree}°)
+Moon Sign: ${chart.core_identity.moon_sign}
+Sun Sign: ${chart.core_identity.sun_sign}
+Nakshatra: ${chart.core_identity.nakshatra} (Pada ${chart.core_identity.nakshatra_pada})
+Tithi: ${chart.core_identity.tithi}`;
+}
+
+function extractPlanetsCompact(chart) {
+  return Object.entries(chart.planets)
+    .map(([planet, d]) => {
+      const retro = d.retro ? " [R]" : "";
+      return `${formatLabel(planet)}: ${d.sign} H${d.house} ${d.degree.toFixed(1)}° ${d.nakshatra}${retro}`;
+    })
+    .join("\n");
+}
+
+function extractHouseScore(hs, label) {
+  return `${label}: ${hs.score}/10 | Lord: ${hs.lord} (${hs.lord_strength}) in H${hs.lord_house}
+  Occupants: ${hs.occupants.length ? hs.occupants.join(", ") : "None"}
+  Benefics: ${hs.benefic_occupants.length ? hs.benefic_occupants.join(", ") : "None"}
+  Malefics: ${hs.malefic_occupants.length ? hs.malefic_occupants.join(", ") : "None"}
+  Aspected by: ${hs.aspected_by.length ? hs.aspected_by.join(", ") : "None"}`;
+}
+
+function extractNavamsaCompact(navamsa) {
+  const lines = [`D9 Lagna: ${navamsa.ascendant.sign}`];
+  for (const [planet, d] of Object.entries(navamsa.planets)) {
+    lines.push(`${formatLabel(planet)}: ${d.sign} H${d.navamsa_house} (${d.strength})`);
+  }
+  return lines.join("\n");
+}
+
+function extractAspectsReceived(aspects, houseNumbers) {
+  return houseNumbers.map((h) => {
+    const received = aspects.aspects_received[String(h)] || [];
+    const names = received.map((a) => `${a.planet} (${a.type})`).join(", ") || "None";
+    return `House ${h} aspected by: ${names}`;
+  }).join("\n");
+}
+
+function extractTransits(transits, label) {
+  return Object.entries(transits)
+    .map(([planet, d]) => {
+      const retro = d.retro ? " [R]" : "";
+      return `${formatLabel(planet)}: ${d.sign} ${d.degree.toFixed(1)}° H${d.transit_house}${retro} (${d.nakshatra})`;
+    })
+    .join("\n");
+}
+
+function extractGunaMilan(data) {
+  if (!data.guna_milan) return "Guna Milan data not available.";
+  const gm = data.guna_milan;
+  const lines = [`Score: ${gm.score}/${gm.max_score} — ${gm.verdict}`];
+  for (const [key, details] of Object.entries(gm.breakdown)) {
+    lines.push(`${formatLabel(key)}: ${details.obtained}/${details.max} (Boy: ${details.boy}, Girl: ${details.girl}) — ${details.area}`);
+  }
+  return lines.join("\n");
+}
+
+function extractDoshas(chart) {
+  const m = chart.doshas.manglik;
+  const lines = [
+    `Manglik: ${m.present ? "YES" : "No"} | Mars in H${m.mars_house} | Severity: ${m.severity} | Cancellation: ${m.cancellation ? "Yes" : "No"}`,
+    `Nadi: ${chart.doshas.nadi.type}`,
+    `Bhakoot: Distance ${chart.doshas.bhakoot.rashi_distance} | ${chart.doshas.bhakoot.compatible ? "Compatible" : "NOT compatible"}`,
+  ];
+  return lines.join("\n");
+}
+
+function extractDasha(chart) {
+  const c = chart.dasha.current;
+  return `Current Dasha: ${c.mahadasha}/${c.antardasha} (${c.start} to ${c.end})
+Marriage Window: ${chart.derived_windows.marriage_window.join(" - ")}
+Career Peak: ${chart.derived_windows.career_peak.join(" - ")}`;
+}
+
+// --- Prompt Builders ---
+
+function buildMarriagePrompt(data) {
+  return `${SYSTEM_PROMPT}
+
+====== CHART DATA ======
+
+--- BOY ---
+${extractCoreIdentity(data.boy)}
+
+Planets:
+${extractPlanetsCompact(data.boy)}
+
+7th House (Marriage):
+${extractHouseScore(data.boy.house_scores.marriage_7th, "Marriage")}
+
+${extractAspectsReceived(data.boy.aspects, [1, 7, 8])}
+
+Doshas:
+${extractDoshas(data.boy)}
+
+Navamsa (D9):
+${extractNavamsaCompact(data.boy.navamsa)}
+
+Dasha & Timing:
+${extractDasha(data.boy)}
+
+--- GIRL ---
+${extractCoreIdentity(data.girl)}
+
+Planets:
+${extractPlanetsCompact(data.girl)}
+
+7th House (Marriage):
+${extractHouseScore(data.girl.house_scores.marriage_7th, "Marriage")}
+
+${extractAspectsReceived(data.girl.aspects, [1, 7, 8])}
+
+Doshas:
+${extractDoshas(data.girl)}
+
+Navamsa (D9):
+${extractNavamsaCompact(data.girl.navamsa)}
+
+Dasha & Timing:
+${extractDasha(data.girl)}
+
+--- GUNA MILAN (Ashtakoota) ---
+${extractGunaMilan(data)}
+
+--- CURRENT TRANSITS ---
+Boy's transits: ${extractTransits(data.boy.transits)}
+Girl's transits: ${extractTransits(data.girl.transits)}
+
+====== ANALYSIS REQUEST ======
+
+Analyze this marriage compatibility in detail. Cover:
+
+1. **Guna Milan Analysis**: Interpret each of the 8 gunas — which are strong, which are weak, and what it means practically for daily married life.
+
+2. **7th House Cross-Analysis**: Compare both 7th houses. Who has the stronger marriage house? What challenges does each partner bring?
+
+3. **Venus & Jupiter Analysis**: Analyze the Karaka planets for marriage (Venus for wife/romance, Jupiter for husband/wisdom) in both charts. Are they well-placed?
+
+4. **Manglik Dosha**: Is there a Manglik mismatch? If yes, does cancellation apply? What remedies exist?
+
+5. **Nadi & Bhakoot Dosha**: Assess health and emotional compatibility based on these doshas.
+
+6. **Navamsa (D9) Confirmation**: Does the D9 chart support or contradict the D1 marriage indications? Check D9 7th house and Venus placement.
+
+7. **Timing**: When is the best period for marriage based on both Dashas?
+
+8. **Final Verdict**: Give a clear tier rating (🟢/🟡/🟠/🔴/⛔) with reasoning.`;
+}
+
+function buildWealthPrompt(data) {
+  return `${SYSTEM_PROMPT}
+
+====== CHART DATA ======
+
+--- BOY ---
+${extractCoreIdentity(data.boy)}
+
+2nd House (Wealth):
+${extractHouseScore(data.boy.house_scores.wealth_2nd, "Wealth")}
+
+11th House (Gains):
+${extractHouseScore(data.boy.house_scores.gains_11th, "Gains")}
+
+${extractAspectsReceived(data.boy.aspects, [2, 6, 10, 11])}
+
+Dasha & Timing:
+${extractDasha(data.boy)}
+
+--- GIRL ---
+${extractCoreIdentity(data.girl)}
+
+2nd House (Wealth):
+${extractHouseScore(data.girl.house_scores.wealth_2nd, "Wealth")}
+
+11th House (Gains):
+${extractHouseScore(data.girl.house_scores.gains_11th, "Gains")}
+
+${extractAspectsReceived(data.girl.aspects, [2, 6, 10, 11])}
+
+Dasha & Timing:
+${extractDasha(data.girl)}
+
+--- CURRENT TRANSITS ---
+Boy: ${extractTransits(data.boy.transits)}
+Girl: ${extractTransits(data.girl.transits)}
+
+====== ANALYSIS REQUEST ======
+
+Analyze the COMBINED financial outlook for this couple after marriage:
+
+1. **Individual Wealth Potential**: Who has the stronger 2nd house? Who earns more easily?
+2. **11th House Gains**: Whose gains house is stronger? Will income grow steadily?
+3. **Malefic Impact**: Are there malefics aspecting or sitting in wealth houses? What does that mean for savings and debts?
+4. **Combined Assessment**: Will this couple be financially comfortable together? Will marriage improve or worsen their financial situation?
+5. **Timing**: When are the best financial periods for each based on Dasha?
+6. **Rating**: Give a tier rating for financial compatibility (🟢/🟡/🟠/🔴/⛔).`;
+}
+
+function buildHealthPrompt(data) {
+  return `${SYSTEM_PROMPT}
+
+====== CHART DATA ======
+
+--- BOY ---
+${extractCoreIdentity(data.boy)}
+
+Planets:
+${extractPlanetsCompact(data.boy)}
+
+Planet Strength: ${JSON.stringify(data.boy.planet_strength)}
+
+${extractAspectsReceived(data.boy.aspects, [1, 6, 8])}
+
+Doshas:
+${extractDoshas(data.boy)}
+
+Navamsa:
+${extractNavamsaCompact(data.boy.navamsa)}
+
+--- GIRL ---
+${extractCoreIdentity(data.girl)}
+
+Planets:
+${extractPlanetsCompact(data.girl)}
+
+Planet Strength: ${JSON.stringify(data.girl.planet_strength)}
+
+${extractAspectsReceived(data.girl.aspects, [1, 6, 8])}
+
+Doshas:
+${extractDoshas(data.girl)}
+
+Navamsa:
+${extractNavamsaCompact(data.girl.navamsa)}
+
+--- NADI DOSHA CHECK ---
+Boy Nadi: ${data.boy.doshas.nadi.type}
+Girl Nadi: ${data.girl.doshas.nadi.type}
+Same Nadi: ${data.boy.doshas.nadi.type === data.girl.doshas.nadi.type ? "YES — NADI DOSHA PRESENT" : "No — Different Nadis (Good)"}
+
+--- CURRENT TRANSITS ---
+Boy: ${extractTransits(data.boy.transits)}
+Girl: ${extractTransits(data.girl.transits)}
+
+====== ANALYSIS REQUEST ======
+
+Analyze health and longevity for both individuals and as a couple:
+
+1. **1st House (Body/Self)**: Analyze the lagna and its lord for both. Any afflictions? Malefic aspects on lagna?
+2. **6th House (Disease)**: What health challenges does each chart indicate? Chronic issues?
+3. **8th House (Longevity)**: Any serious concerns? Malefics in 8th? 8th lord afflicted?
+4. **Nadi Dosha Impact**: If same Nadi exists, what are the health implications for the couple and their children? Are there cancellation factors?
+5. **Mental Health**: Analyze Moon strength and afflictions for emotional/mental wellbeing of both.
+6. **Children's Health Indicators**: Based on 5th house and Jupiter, any concerns for offspring health?
+7. **Rating**: Give a tier rating for health compatibility (🟢/🟡/🟠/🔴/⛔).`;
+}
+
+function buildChildrenPrompt(data) {
+  const boyH5 = data.boy.houses["5"];
+  const girlH5 = data.girl.houses["5"];
+  return `${SYSTEM_PROMPT}
+
+====== CHART DATA ======
+
+--- BOY ---
+${extractCoreIdentity(data.boy)}
+
+5th House (Children): Sign: ${boyH5.sign}, Lord: ${boyH5.lord}, Occupants: ${boyH5.occupants.length ? boyH5.occupants.join(", ") : "None"}
+${extractAspectsReceived(data.boy.aspects, [5])}
+Jupiter (Putra Karaka): ${data.boy.planets.jupiter.sign} H${data.boy.planets.jupiter.house} (${data.boy.planet_strength.jupiter})
+
+Navamsa 5th house & Jupiter:
+${data.boy.navamsa.planets.jupiter ? `D9 Jupiter: ${data.boy.navamsa.planets.jupiter.sign} H${data.boy.navamsa.planets.jupiter.navamsa_house} (${data.boy.navamsa.planets.jupiter.strength})` : "N/A"}
+
+Dasha:
+${extractDasha(data.boy)}
+
+--- GIRL ---
+${extractCoreIdentity(data.girl)}
+
+5th House (Children): Sign: ${girlH5.sign}, Lord: ${girlH5.lord}, Occupants: ${girlH5.occupants.length ? girlH5.occupants.join(", ") : "None"}
+${extractAspectsReceived(data.girl.aspects, [5])}
+Jupiter (Putra Karaka): ${data.girl.planets.jupiter.sign} H${data.girl.planets.jupiter.house} (${data.girl.planet_strength.jupiter})
+
+Navamsa 5th house & Jupiter:
+${data.girl.navamsa.planets.jupiter ? `D9 Jupiter: ${data.girl.navamsa.planets.jupiter.sign} H${data.girl.navamsa.planets.jupiter.navamsa_house} (${data.girl.navamsa.planets.jupiter.strength})` : "N/A"}
+
+Dasha:
+${extractDasha(data.girl)}
+
+--- CURRENT TRANSITS ---
+Boy: ${extractTransits(data.boy.transits)}
+Girl: ${extractTransits(data.girl.transits)}
+
+====== ANALYSIS REQUEST ======
+
+Analyze progeny (children) prospects for this couple:
+
+1. **5th House Analysis**: Both charts — is the 5th house strong? Any malefic affliction?
+2. **Jupiter (Putra Karaka)**: Is Jupiter well-placed in both D1 and D9?
+3. **5th Lord Strength**: Where is the 5th lord placed? Strong or weak?
+4. **Timing for Children**: Based on Dasha periods, when are children most likely?
+5. **Number & Gender Indicators**: Any traditional indicators for number or gender of children?
+6. **Challenges**: Are there any doshas or afflictions that could delay or deny children?
+7. **Rating**: Give a tier rating for children prospects (🟢/🟡/🟠/🔴/⛔).`;
+}
+
+function buildCareerPrompt(data) {
+  return `${SYSTEM_PROMPT}
+
+====== CHART DATA ======
+
+--- BOY ---
+${extractCoreIdentity(data.boy)}
+
+10th House (Career):
+${extractHouseScore(data.boy.house_scores.career_10th, "Career")}
+
+${extractAspectsReceived(data.boy.aspects, [2, 10, 11])}
+
+Planet Strength: ${JSON.stringify(data.boy.planet_strength)}
+
+Dasha & Timing:
+${extractDasha(data.boy)}
+
+--- GIRL ---
+${extractCoreIdentity(data.girl)}
+
+10th House (Career):
+${extractHouseScore(data.girl.house_scores.career_10th, "Career")}
+
+${extractAspectsReceived(data.girl.aspects, [2, 10, 11])}
+
+Planet Strength: ${JSON.stringify(data.girl.planet_strength)}
+
+Dasha & Timing:
+${extractDasha(data.girl)}
+
+--- CURRENT TRANSITS ---
+Boy: ${extractTransits(data.boy.transits)}
+Girl: ${extractTransits(data.girl.transits)}
+
+====== ANALYSIS REQUEST ======
+
+Analyze the combined career outlook for this couple:
+
+1. **Individual Career Strength**: Whose 10th house is stronger? Who has better professional prospects?
+2. **Mutual Support**: Will this marriage help or hinder each person's career? Look at 7th lord's connection to 10th house.
+3. **Career Peak Timing**: Each person's best career period based on Dasha.
+4. **Saturn's Role**: Saturn is the Karma karaka — how is Saturn placed in both charts?
+5. **Combined Growth**: Will this couple grow professionally together? Or will one partner's career suffer?
+6. **Rating**: Give a tier rating for career compatibility (🟢/🟡/🟠/🔴/⛔).`;
+}
+
+function buildOverallPrompt(data) {
+  return `${SYSTEM_PROMPT}
+
+====== COMPLETE CHART DATA ======
+
+--- BOY ---
+Birth: ${data.boy.meta.local_datetime} at ${data.boy.meta.place_name}
+${extractCoreIdentity(data.boy)}
+
+All Planets:
+${extractPlanetsCompact(data.boy)}
+
+Planet Strength: ${JSON.stringify(data.boy.planet_strength)}
+
+House Scores:
+${extractHouseScore(data.boy.house_scores.wealth_2nd, "2nd Wealth")}
+${extractHouseScore(data.boy.house_scores.marriage_7th, "7th Marriage")}
+${extractHouseScore(data.boy.house_scores.career_10th, "10th Career")}
+${extractHouseScore(data.boy.house_scores.gains_11th, "11th Gains")}
+
+Doshas:
+${extractDoshas(data.boy)}
+
+Navamsa (D9):
+${extractNavamsaCompact(data.boy.navamsa)}
+
+Dasha & Timing:
+${extractDasha(data.boy)}
+
+--- GIRL ---
+Birth: ${data.girl.meta.local_datetime} at ${data.girl.meta.place_name}
+${extractCoreIdentity(data.girl)}
+
+All Planets:
+${extractPlanetsCompact(data.girl)}
+
+Planet Strength: ${JSON.stringify(data.girl.planet_strength)}
+
+House Scores:
+${extractHouseScore(data.girl.house_scores.wealth_2nd, "2nd Wealth")}
+${extractHouseScore(data.girl.house_scores.marriage_7th, "7th Marriage")}
+${extractHouseScore(data.girl.house_scores.career_10th, "10th Career")}
+${extractHouseScore(data.girl.house_scores.gains_11th, "11th Gains")}
+
+Doshas:
+${extractDoshas(data.girl)}
+
+Navamsa (D9):
+${extractNavamsaCompact(data.girl.navamsa)}
+
+Dasha & Timing:
+${extractDasha(data.girl)}
+
+--- GUNA MILAN (Ashtakoota) ---
+${extractGunaMilan(data)}
+
+--- CURRENT TRANSITS ---
+Boy: ${extractTransits(data.boy.transits)}
+Girl: ${extractTransits(data.girl.transits)}
+
+====== ANALYSIS REQUEST ======
+
+Give a COMPREHENSIVE marriage compatibility analysis covering ALL aspects:
+
+1. **💍 Marriage Compatibility** — Guna Milan interpretation, 7th house cross-analysis, Venus/Jupiter placement, Manglik/Nadi/Bhakoot doshas
+
+2. **💰 Wealth & Finance** — Combined financial outlook, who earns more, will marriage improve finances?
+
+3. **💪 Health & Longevity** — Health risks for both, Nadi dosha impact, mental health indicators
+
+4. **👶 Children & Family** — Progeny prospects, timing, any concerns
+
+5. **💼 Career & Growth** — Combined career trajectory, will they support each other professionally?
+
+6. **⏰ Timing** — Best period for marriage, career peaks, financial highs, children timing
+
+For EACH section above, give a clear tier rating:
+⭐ Excellent / ✅ Good / ⚠️ Average / ❌ Challenging / 🚫 Serious Concern
+
+7. **⚡ FINAL VERDICT**: 
+   Give ONE of these ratings with full justification:
+   🟢 BEST MATCH — rare celestial alignment, highly favorable
+   🟡 GOOD MATCH — solid foundation, minor issues manageable  
+   🟠 AVERAGE — proceed with awareness, some areas need work
+   🔴 CHALLENGING — serious remedies needed before proceeding
+   ⛔ AVOID — major fundamental incompatibility
+
+   Also tell: "Is this the best this person can find, or should they look further?"
+   Be brutally honest.`;
+}
+
 
 function formatLabel(value) {
   return value
