@@ -224,6 +224,23 @@ The app generates **6 specialized ChatGPT prompts** from the chart data. Each pr
 
 ---
 
+## ⚖️ Accuracy & Disclaimer
+
+While this system uses the high-precision **Swiss Ephemeris** for astronomical calculations, astrological accuracy for historical birth dates depends heavily on **Timezone Resolution**.
+
+### 🇮🇳 Special Note on India (Pre-1960)
+Historical timekeeping in India was complex. Before 1955, many cities observed local municipal times rather than the Indian Standard Time (IST):
+*   **Bombay Time (UTC +4:51)**: Widely used in Mumbai until 1955.
+*   **Calcutta Time (UTC +5:54)**: Widely used in Kolkata until 1948.
+*   **War Time (UTC +6:30)**: Observed across India during WWII (Oct 1941 – Oct 1945).
+
+### 🌍 Global Accuracy
+For international births (USA, Europe, etc.), the system uses historical IANA databases to resolve Daylight Saving Time (DST). While highly accurate, political and local changes can occasionally lead to drift in very old records.
+
+**Recommendation**: For any birth before 1960, we recommend cross-verifying the "UTC Offset" against official birth records to ensure the chart's Lagna (Ascendant) is correct.
+
+---
+
 ## 📄 License
 
 Internal use only.

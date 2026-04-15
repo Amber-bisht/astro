@@ -543,3 +543,20 @@ pre {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+.footer-disclaimer {
+  margin-top: 40px;
+  padding: 20px;
+  background: rgba(141, 79, 45, 0.04);
+  border-radius: 16px;
+  border: 1px dashed rgba(141, 79, 45, 0.2);
+  text-align: center;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.footer-disclaimer strong {
+  color: var(--primary);
+  display: block;
+  margin-bottom: 4px;
+}

@@ -57,29 +57,28 @@ class GeocodingService:
             )
         return provider
 
-    def autocomplete(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
+    def autocomplete(self, query: str, limit: int = 5, birth_timestamp: int | None = None) -> list[dict[str, Any]]:
         query = query.strip()
         if len(query) < 2:
             return []
         provider = self.require_provider()
         if provider == "opencage":
             return self._opencage_search(query, limit)
-        return self._google_search(query, limit)
+        return self._google_search(query, limit, birth_timestamp=birth_timestamp)
 
-    def resolve_place(self, place_input: str | dict[str, Any]) -> ResolvedPlace:
+    def resolve_place(self, place_input: str | dict[str, Any], birth_timestamp: int | None = None) -> ResolvedPlace:
         if isinstance(place_input, str):
             query = place_input.strip()
             if not query:
                 raise LocationResolutionError("Place of birth is required.")
-            candidates = self.autocomplete(query, limit=1)
-            if not candidates:
-                raise LocationResolutionError(f"Could not resolve place '{query}'.")
+            candidates = self.autocomplete(query, limit=1, birth_timestamp=birth_timestamp)
             top = candidates[0]
+            final_timezone = top["timezone"]
             return ResolvedPlace(
                 label=top["label"],
                 lat=float(top["lat"]),
                 lon=float(top["lon"]),
-                timezone=top["timezone"],
+                timezone=final_timezone,
             )
 
         label = (place_input.get("label") or place_input.get("query") or "").strip()
@@ -112,10 +111,20 @@ class GeocodingService:
     ) -> ResolvedBirthData:
         accuracy = self._normalize_time_accuracy(time_value, time_accuracy)
         birth_time = self._parse_birth_time(time_value, accuracy)
-        place = self.resolve_place(place_input)
+        
+        # Determine birth timestamp for timezone lookup
+        # We use a naive UTC timestamp first to get the correct historical ID
+        provisional_utc = datetime.combine(dob, birth_time, tzinfo=timezone.utc)
+        birth_timestamp = int(provisional_utc.timestamp())
+
+        place = self.resolve_place(place_input, birth_timestamp=birth_timestamp)
         local_tz = ZoneInfo(place.timezone)
-        local_datetime = datetime.combine(dob, birth_time, tzinfo=local_tz)
+        
+        # combine() doesn't take fold in Python 3.9; use replace() instead.
+        # This handles the second occurrence of a repeated hour (switch-backs).
+        local_datetime = datetime.combine(dob, birth_time, tzinfo=local_tz).replace(fold=1)
         utc_datetime = local_datetime.astimezone(timezone.utc)
+        
         return ResolvedBirthData(
             name=(name or "").strip() or None,
             dob=dob,
@@ -178,7 +187,7 @@ class GeocodingService:
                 )
         return results
 
-    def _google_search(self, query: str, limit: int) -> list[dict[str, Any]]:
+    def _google_search(self, query: str, limit: int, birth_timestamp: int | None = None) -> list[dict[str, Any]]:
         response = requests.get(
             "https://maps.googleapis.com/maps/api/geocode/json",
             params={"address": query, "key": self.google_key},
@@ -197,7 +206,7 @@ class GeocodingService:
             lon = location.get("lng")
             if lat is None or lon is None:
                 continue
-            timezone_name = self._google_timezone(float(lat), float(lon))
+            timezone_name = self._google_timezone(float(lat), float(lon), timestamp=birth_timestamp)
             results.append(
                 {
                     "label": item.get("formatted_address") or query,
@@ -208,12 +217,15 @@ class GeocodingService:
             )
         return results
 
-    def _google_timezone(self, lat: float, lon: float) -> str:
+    def _google_timezone(self, lat: float, lon: float, timestamp: int | None = None) -> str:
+        if timestamp is None:
+            timestamp = int(datetime.now(tz=timezone.utc).timestamp())
+            
         response = requests.get(
             "https://maps.googleapis.com/maps/api/timezone/json",
             params={
                 "location": f"{lat},{lon}",
-                "timestamp": int(datetime.now(tz=timezone.utc).timestamp()),
+                "timestamp": timestamp,
                 "key": self.google_key,
             },
             timeout=10,
