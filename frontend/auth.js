@@ -105,8 +105,8 @@ const AUTH = {
 
     el.innerHTML = `
       <a href="/" class="nav-brand">
-        <span class="nav-brand-icon">🪐</span>
-        <span class="nav-brand-name">Kundali Engine</span>
+        <span class="nav-brand-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><ellipse cx="12" cy="12" rx="11" ry="4" transform="rotate(-30 12 12)"/></svg></span>
+        <span class="nav-brand-name">astro.amberbisht.me</span>
       </a>
       <div class="nav-right">${rightHtml}</div>
     `;

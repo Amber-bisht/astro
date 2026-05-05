@@ -1,339 +1,341 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kundali Engine — Vedic Astrology Tools</title>
-    <meta name="description" content="Professional Vedic astrology tools: Kundli Matching (Guna Milan) and Birth Chart (Kundli) generation with precise calculations." />
-    <link rel="stylesheet" href="/assets/style.css" />
-    <style>
-      .landing-hero {
-        text-align: center;
-        padding: 48px 24px 20px;
-      }
 
-      .landing-hero h1 {
-        font-size: clamp(2rem, 5vw, 3.4rem);
-        line-height: 1.08;
-        margin-bottom: 14px;
-        background: linear-gradient(135deg, var(--primary-deep) 0%, var(--primary) 40%, #c47d42 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-      }
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>astro.amberbisht.me — Vedic Astrology Tools</title>
+  <meta name="description"
+    content="Professional Vedic astrology tools: Kundli Matching (Guna Milan) and Birth Chart (Kundli) generation with precise calculations." />
+  <link rel="stylesheet" href="/assets/style.css" />
+  <style>
+    .landing-hero {
+      text-align: center;
+      padding: 28px 24px 10px;
+    }
 
-      .landing-hero p {
-        color: var(--muted);
-        font-size: 1.08rem;
-        max-width: 52ch;
-        margin: 0 auto;
-        line-height: 1.6;
-      }
+    .landing-hero h1 {
+      font-size: clamp(2rem, 5vw, 3.4rem);
+      line-height: 1.08;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, var(--primary-deep) 0%, var(--primary) 40%, #c47d42 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
 
+    .landing-hero p {
+      color: var(--muted);
+      font-size: 1.08rem;
+      max-width: 52ch;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px;
+      margin-top: 20px;
+      margin-bottom: 18px;
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      padding: 36px 28px 32px;
+      text-align: center;
+      text-decoration: none;
+      color: inherit;
+      transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 260ms ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 0%, rgba(141, 79, 45, 0.06), transparent 70%);
+      opacity: 0;
+      transition: opacity 300ms ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 32px 60px rgba(84, 52, 32, 0.18);
+      border-color: rgba(141, 79, 45, 0.28);
+    }
+
+    .feature-card:hover::before {
+      opacity: 1;
+    }
+
+    .feature-icon {
+      width: 88px;
+      height: 88px;
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.6rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .feature-card:nth-child(1) .feature-icon {
+      background: linear-gradient(135deg, rgba(141, 79, 45, 0.12) 0%, rgba(196, 125, 66, 0.18) 100%);
+    }
+
+    .feature-card:nth-child(2) .feature-icon {
+      background: linear-gradient(135deg, rgba(85, 122, 70, 0.12) 0%, rgba(110, 156, 87, 0.18) 100%);
+    }
+
+    .feature-card h2 {
+      font-size: 1.5rem;
+      margin: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .feature-desc {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.55;
+      max-width: 32ch;
+      position: relative;
+      z-index: 1;
+    }
+
+    .feature-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 999px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      margin-top: 4px;
+      transition: transform 200ms ease, box-shadow 200ms ease;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cta-matching {
+      background: linear-gradient(135deg, var(--primary) 0%, #b66b42 100%);
+      color: #fffaf2;
+    }
+
+    .cta-kundli {
+      background: linear-gradient(135deg, #557a46 0%, #6e9c57 100%);
+      color: #f5fff0;
+    }
+
+    .feature-card:hover .feature-cta {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(84, 52, 32, 0.15);
+    }
+
+    .feature-cta svg {
+      transition: transform 200ms ease;
+    }
+
+    .feature-card:hover .feature-cta svg {
+      transform: translateX(3px);
+    }
+
+    .feature-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .feature-tag {
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      background: rgba(141, 79, 45, 0.07);
+      color: var(--muted);
+      border: 1px solid rgba(141, 79, 45, 0.1);
+    }
+
+    /* Predictions Section */
+    .predictions-section {
+      margin-top: 0;
+      margin-bottom: 30px;
+    }
+
+    .section-heading {
+      text-align: center;
+      font-size: 1.3rem;
+      color: var(--text);
+      margin-bottom: 20px;
+    }
+
+    .predictions-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .pred-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: 0 12px 30px rgba(84, 52, 32, 0.08);
+      backdrop-filter: blur(18px);
+      padding: 24px 20px;
+      text-align: center;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 240ms ease;
+    }
+
+    .pred-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 24px 48px rgba(84, 52, 32, 0.14);
+      border-color: rgba(141, 79, 45, 0.24);
+    }
+
+    .pred-icon {
+      font-size: 2rem;
+      margin-bottom: 2px;
+    }
+
+    .pred-card h3 {
+      font-size: 1.15rem;
+      margin: 0;
+    }
+
+    .pred-card p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.45;
+      max-width: 22ch;
+    }
+
+    .pred-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: rgba(141, 79, 45, 0.1);
+      color: var(--primary);
+      border: 1px solid rgba(141, 79, 45, 0.14);
+      margin-top: 4px;
+    }
+
+    @media (max-width: 720px) {
       .feature-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 28px;
-        margin-top: 36px;
-        margin-bottom: 40px;
-      }
-
-      .feature-card {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        backdrop-filter: blur(18px);
-        padding: 36px 28px 32px;
-        text-align: center;
-        text-decoration: none;
-        color: inherit;
-        transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
-                    box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
-                    border-color 260ms ease;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 16px;
-        position: relative;
-        overflow: hidden;
-      }
-
-      .feature-card::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(circle at 50% 0%, rgba(141, 79, 45, 0.06), transparent 70%);
-        opacity: 0;
-        transition: opacity 300ms ease;
-      }
-
-      .feature-card:hover {
-        transform: translateY(-6px);
-        box-shadow: 0 32px 60px rgba(84, 52, 32, 0.18);
-        border-color: rgba(141, 79, 45, 0.28);
-      }
-
-      .feature-card:hover::before {
-        opacity: 1;
-      }
-
-      .feature-icon {
-        width: 88px;
-        height: 88px;
-        border-radius: 24px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 2.6rem;
-        position: relative;
-        z-index: 1;
-      }
-
-      .feature-card:nth-child(1) .feature-icon {
-        background: linear-gradient(135deg, rgba(141, 79, 45, 0.12) 0%, rgba(196, 125, 66, 0.18) 100%);
-      }
-
-      .feature-card:nth-child(2) .feature-icon {
-        background: linear-gradient(135deg, rgba(85, 122, 70, 0.12) 0%, rgba(110, 156, 87, 0.18) 100%);
-      }
-
-      .feature-card h2 {
-        font-size: 1.5rem;
-        margin: 0;
-        position: relative;
-        z-index: 1;
-      }
-
-      .feature-desc {
-        color: var(--muted);
-        font-size: 0.95rem;
-        line-height: 1.55;
-        max-width: 32ch;
-        position: relative;
-        z-index: 1;
-      }
-
-      .feature-cta {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 12px 24px;
-        border-radius: 999px;
-        font-size: 0.92rem;
-        font-weight: 600;
-        margin-top: 4px;
-        transition: transform 200ms ease, box-shadow 200ms ease;
-        position: relative;
-        z-index: 1;
-      }
-
-      .cta-matching {
-        background: linear-gradient(135deg, var(--primary) 0%, #b66b42 100%);
-        color: #fffaf2;
-      }
-
-      .cta-kundli {
-        background: linear-gradient(135deg, #557a46 0%, #6e9c57 100%);
-        color: #f5fff0;
-      }
-
-      .feature-card:hover .feature-cta {
-        transform: translateY(-1px);
-        box-shadow: 0 8px 20px rgba(84, 52, 32, 0.15);
-      }
-
-      .feature-cta svg {
-        transition: transform 200ms ease;
-      }
-
-      .feature-card:hover .feature-cta svg {
-        transform: translateX(3px);
-      }
-
-      .feature-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        justify-content: center;
-        position: relative;
-        z-index: 1;
-      }
-
-      .feature-tag {
-        padding: 5px 12px;
-        border-radius: 999px;
-        font-size: 0.78rem;
-        background: rgba(141, 79, 45, 0.07);
-        color: var(--muted);
-        border: 1px solid rgba(141, 79, 45, 0.1);
-      }
-
-      /* Predictions Section */
-      .predictions-section {
-        margin-top: 16px;
-        margin-bottom: 40px;
-      }
-
-      .section-heading {
-        text-align: center;
-        font-size: 1.3rem;
-        color: var(--text);
-        margin-bottom: 20px;
+        grid-template-columns: 1fr;
+        gap: 20px;
       }
 
       .predictions-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 18px;
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+
+      .landing-hero {
+        padding: 20px 16px 8px;
+      }
+
+      .feature-card {
+        padding: 28px 20px 24px;
       }
 
       .pred-card {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: 20px;
-        box-shadow: 0 12px 30px rgba(84, 52, 32, 0.08);
-        backdrop-filter: blur(18px);
-        padding: 24px 20px;
-        text-align: center;
-        text-decoration: none;
-        color: inherit;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 8px;
-        transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
-                    box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
-                    border-color 240ms ease;
+        padding: 20px 16px;
       }
+    }
+  </style>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
 
-      .pred-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 24px 48px rgba(84, 52, 32, 0.14);
-        border-color: rgba(141, 79, 45, 0.24);
-      }
+<body>
+  <main class="page-shell">
+    <nav class="navbar" id="app-navbar"></nav>
+    <section class="landing-hero">
+      <h1>astro.amberbisht.me</h1>
+      <p>Precise Vedic astrology calculations powered by the Swiss Ephemeris. Lahiri Ayanamsa · Whole Sign Houses ·
+        Validated Charts.</p>
+    </section>
 
-      .pred-icon {
-        font-size: 2rem;
-        margin-bottom: 2px;
-      }
+    <section class="feature-grid">
+      <a href="/matching" class="feature-card" id="feature-matching">
+        <div class="feature-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 2L12 5.5 15.5 2"/><path d="M12 5.5L8.5 9 12 22 15.5 9 12 5.5z"/><circle cx="12" cy="14" r="7"/></svg></div>
+        <h2>Kundli Matching</h2>
+        <p class="feature-desc">Ashtakoota Guna Milan for marriage compatibility — 36-point analysis with dosha checks
+          and AI-powered insights.</p>
+        <span class="feature-cta cta-matching">
+          Check Compatibility
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14" />
+            <path d="m12 5 7 7-7 7" />
+          </svg>
+        </span>
+      </a>
 
-      .pred-card h3 {
-        font-size: 1.15rem;
-        margin: 0;
-      }
+      <a href="/kundli" class="feature-card" id="feature-kundli">
+        <div class="feature-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><ellipse cx="12" cy="12" rx="11" ry="4" transform="rotate(-30 12 12)"/><circle cx="7" cy="7" r="1" fill="var(--success)"/><circle cx="18" cy="16" r="0.7" fill="var(--success)"/></svg></div>
+        <h2>Kundli / Birth Chart</h2>
+        <p class="feature-desc">Complete Vedic birth chart with planets, houses, Navamsa (D9), Dasha periods, doshas,
+          and transit analysis.</p>
+        <span class="feature-cta cta-kundli">
+          Generate Kundli
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14" />
+            <path d="m12 5 7 7-7 7" />
+          </svg>
+        </span>
+      </a>
+    </section>
 
-      .pred-card p {
-        font-size: 0.85rem;
-        color: var(--muted);
-        line-height: 1.45;
-        max-width: 22ch;
-      }
-
-      .pred-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 999px;
-        font-size: 0.72rem;
-        font-weight: 600;
-        background: rgba(141, 79, 45, 0.1);
-        color: var(--primary);
-        border: 1px solid rgba(141, 79, 45, 0.14);
-        margin-top: 4px;
-      }
-
-      @media (max-width: 720px) {
-        .feature-grid {
-          grid-template-columns: 1fr;
-          gap: 20px;
-        }
-
-        .predictions-grid {
-          grid-template-columns: 1fr;
-          gap: 14px;
-        }
-
-        .landing-hero {
-          padding: 32px 16px 12px;
-        }
-
-        .feature-card {
-          padding: 28px 20px 24px;
-        }
-
-        .pred-card {
-          padding: 20px 16px;
-        }
-      }
-    </style>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-  </head>
-  <body>
-    <main class="page-shell">
-      <nav class="navbar" id="app-navbar"></nav>
-      <section class="landing-hero">
-        <h1>Kundali Engine</h1>
-        <p>Precise Vedic astrology calculations powered by the Swiss Ephemeris. Lahiri Ayanamsa · Whole Sign Houses · Validated Charts.</p>
-      </section>
-
-      <section class="feature-grid">
-        <a href="/matching" class="feature-card" id="feature-matching">
-          <div class="feature-icon">💍</div>
-          <h2>Kundli Matching</h2>
-          <p class="feature-desc">Ashtakoota Guna Milan for marriage compatibility — 36-point analysis with dosha checks and AI-powered insights.</p>
-          <div class="feature-tags">
-            <span class="feature-tag">Guna Milan</span>
-            <span class="feature-tag">Manglik Dosha</span>
-            <span class="feature-tag">AI Prompts</span>
-          </div>
-          <span class="feature-cta cta-matching">
-            Check Compatibility
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-          </span>
+    <section class="predictions-section">
+      <h2 class="section-heading">Predictions & Forecasts</h2>
+      <div class="predictions-grid">
+        <a href="/daily" class="pred-card" id="pred-daily">
+          <div class="pred-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></div>
+          <h3>Daily</h3>
+          <p>Today's quick guidance — do's, don'ts, lucky tips</p>
         </a>
-
-        <a href="/kundli" class="feature-card" id="feature-kundli">
-          <div class="feature-icon">🪐</div>
-          <h2>Kundli / Birth Chart</h2>
-          <p class="feature-desc">Complete Vedic birth chart with planets, houses, Navamsa (D9), Dasha periods, doshas, and transit analysis.</p>
-          <div class="feature-tags">
-            <span class="feature-tag">Birth Chart</span>
-            <span class="feature-tag">Dasha</span>
-            <span class="feature-tag">Navamsa D9</span>
-          </div>
-          <span class="feature-cta cta-kundli">
-            Generate Kundli
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-          </span>
+        <a href="/monthly" class="pred-card" id="pred-monthly">
+          <div class="pred-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></svg></div>
+          <h3>Monthly</h3>
+          <p>This month's forecast — career, money, love, key dates</p>
         </a>
-      </section>
-
-      <section class="predictions-section">
-        <h2 class="section-heading">Predictions & Forecasts</h2>
-        <div class="predictions-grid">
-          <a href="/daily" class="pred-card" id="pred-daily">
-            <div class="pred-icon">☀️</div>
-            <h3>Daily</h3>
-            <p>Today's quick guidance — do's, don'ts, lucky tips</p>
-            <span class="pred-badge">~100 words</span>
-          </a>
-          <a href="/monthly" class="pred-card" id="pred-monthly">
-            <div class="pred-icon">📆</div>
-            <h3>Monthly</h3>
-            <p>This month's forecast — career, money, love, key dates</p>
-            <span class="pred-badge">~200 words</span>
-          </a>
-          <a href="/yearly" class="pred-card" id="pred-yearly">
-            <div class="pred-icon">📊</div>
-            <h3>Yearly</h3>
-            <p>Full year overview with quarter-by-quarter breakdown</p>
-            <span class="pred-badge">Full Report</span>
-          </a>
-        </div>
-      </section>
+        <a href="/yearly" class="pred-card" id="pred-yearly">
+          <div class="pred-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16V9"/><path d="M11 16V5"/><path d="M15 16v-4"/><path d="M19 16v-7"/></svg></div>
+          <h3>Yearly</h3>
+          <p>Full year overview with quarter-by-quarter breakdown</p>
+        </a>
+      </div>
+    </section>
 
 
-    </main>
-    <script src="/assets/auth.js" defer></script>
-  </body>
+  </main>
+  <script src="/assets/auth.js" defer></script>
+</body>
+
 </html>
