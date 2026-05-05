@@ -103,6 +103,21 @@ async def kundli_page() -> FileResponse:
     return FileResponse(FRONTEND_DIR / "single.html")
 
 
+@app.get("/daily")
+async def daily_page() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "daily.html")
+
+
+@app.get("/monthly")
+async def monthly_page() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "monthly.html")
+
+
+@app.get("/yearly")
+async def yearly_page() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "yearly.html")
+
+
 @app.get("/health")
 async def health() -> dict[str, object]:
     return {

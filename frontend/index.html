@@ -128,12 +128,12 @@
         z-index: 1;
       }
 
-      .feature-card:nth-child(1) .feature-cta {
+      .cta-matching {
         background: linear-gradient(135deg, var(--primary) 0%, #b66b42 100%);
         color: #fffaf2;
       }
 
-      .feature-card:nth-child(2) .feature-cta {
+      .cta-kundli {
         background: linear-gradient(135deg, #557a46 0%, #6e9c57 100%);
         color: #f5fff0;
       }
@@ -169,10 +169,88 @@
         border: 1px solid rgba(141, 79, 45, 0.1);
       }
 
+      /* Predictions Section */
+      .predictions-section {
+        margin-top: 16px;
+        margin-bottom: 40px;
+      }
+
+      .section-heading {
+        text-align: center;
+        font-size: 1.3rem;
+        color: var(--text);
+        margin-bottom: 20px;
+      }
+
+      .predictions-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+
+      .pred-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        box-shadow: 0 12px 30px rgba(84, 52, 32, 0.08);
+        backdrop-filter: blur(18px);
+        padding: 24px 20px;
+        text-align: center;
+        text-decoration: none;
+        color: inherit;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+                    box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
+                    border-color 240ms ease;
+      }
+
+      .pred-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 24px 48px rgba(84, 52, 32, 0.14);
+        border-color: rgba(141, 79, 45, 0.24);
+      }
+
+      .pred-icon {
+        font-size: 2rem;
+        margin-bottom: 2px;
+      }
+
+      .pred-card h3 {
+        font-size: 1.15rem;
+        margin: 0;
+      }
+
+      .pred-card p {
+        font-size: 0.85rem;
+        color: var(--muted);
+        line-height: 1.45;
+        max-width: 22ch;
+      }
+
+      .pred-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        background: rgba(141, 79, 45, 0.1);
+        color: var(--primary);
+        border: 1px solid rgba(141, 79, 45, 0.14);
+        margin-top: 4px;
+      }
+
       @media (max-width: 720px) {
         .feature-grid {
           grid-template-columns: 1fr;
           gap: 20px;
+        }
+
+        .predictions-grid {
+          grid-template-columns: 1fr;
+          gap: 14px;
         }
 
         .landing-hero {
@@ -181,6 +259,10 @@
 
         .feature-card {
           padding: 28px 20px 24px;
+        }
+
+        .pred-card {
+          padding: 20px 16px;
         }
       }
     </style>
@@ -202,7 +284,7 @@
             <span class="feature-tag">Manglik Dosha</span>
             <span class="feature-tag">AI Prompts</span>
           </div>
-          <span class="feature-cta">
+          <span class="feature-cta cta-matching">
             Check Compatibility
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
           </span>
@@ -217,16 +299,38 @@
             <span class="feature-tag">Dasha</span>
             <span class="feature-tag">Navamsa D9</span>
           </div>
-          <span class="feature-cta">
+          <span class="feature-cta cta-kundli">
             Generate Kundli
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
           </span>
         </a>
       </section>
 
-      <footer class="footer-disclaimer">
-        <p><strong>Note on Historical Accuracy:</strong> For birth dates before 1960, please verify the local time rules (e.g., Bombay/Calcutta local time or War Time shifts) to ensure the highest degree of chart accuracy.</p>
-      </footer>
+      <section class="predictions-section">
+        <h2 class="section-heading">Predictions & Forecasts</h2>
+        <div class="predictions-grid">
+          <a href="/daily" class="pred-card" id="pred-daily">
+            <div class="pred-icon">☀️</div>
+            <h3>Daily</h3>
+            <p>Today's quick guidance — do's, don'ts, lucky tips</p>
+            <span class="pred-badge">~100 words</span>
+          </a>
+          <a href="/monthly" class="pred-card" id="pred-monthly">
+            <div class="pred-icon">📆</div>
+            <h3>Monthly</h3>
+            <p>This month's forecast — career, money, love, key dates</p>
+            <span class="pred-badge">~200 words</span>
+          </a>
+          <a href="/yearly" class="pred-card" id="pred-yearly">
+            <div class="pred-icon">📊</div>
+            <h3>Yearly</h3>
+            <p>Full year overview with quarter-by-quarter breakdown</p>
+            <span class="pred-badge">Full Report</span>
+          </a>
+        </div>
+      </section>
+
+
     </main>
   </body>
 </html>

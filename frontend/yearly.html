@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Yearly Forecast — Vedic Astrology</title>
+    <meta name="description" content="Get your personalized Vedic yearly forecast with career, money, love, health, and quarter-by-quarter breakdown." />
+    <link rel="stylesheet" href="/assets/style.css" />
+    <style>
+      .back-link {
+        display: inline-flex; align-items: center; gap: 6px;
+        color: var(--primary); text-decoration: none; font-size: 0.92rem; font-weight: 500;
+        margin-bottom: 20px; padding: 8px 14px; border-radius: 999px;
+        background: rgba(141, 79, 45, 0.06); border: 1px solid rgba(141, 79, 45, 0.1);
+        transition: background 200ms ease, transform 200ms ease;
+      }
+      .back-link:hover { background: rgba(141, 79, 45, 0.12); transform: translateX(-2px); }
+      .single-input-section { max-width: 560px; margin: 0 auto 22px; }
+      .page-title { text-align: center; margin-bottom: 24px; }
+      .page-title h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); margin-bottom: 6px;
+        background: linear-gradient(135deg, var(--primary-deep), #c47d42);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+      .page-title p { color: var(--muted); font-size: 0.95rem; }
+      .prompt-output { margin-top: 12px; }
+      .prompt-output pre { white-space: pre-wrap; word-break: break-word; font-size: 0.84rem; line-height: 1.55; max-height: 600px; overflow-y: auto; }
+      .prompt-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+      .sibling-links { display: flex; gap: 10px; justify-content: center; margin-bottom: 24px; flex-wrap: wrap; }
+      .sibling-link { padding: 8px 18px; border-radius: 999px; font-size: 0.88rem; text-decoration: none;
+        border: 1px solid rgba(141, 79, 45, 0.15); color: var(--muted); background: rgba(255,255,255,0.6);
+        transition: all 200ms ease; }
+      .sibling-link:hover { background: rgba(141, 79, 45, 0.08); color: var(--primary); }
+      .sibling-link.active { background: linear-gradient(135deg, var(--primary), #b66b42); color: #fffaf2;
+        border-color: var(--primary); font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main class="page-shell">
+      <a href="/" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Back to Home
+      </a>
+
+      <div class="page-title">
+        <h1>📊 Yearly Forecast</h1>
+        <p>Full year overview — career, money, love, health, quarter-by-quarter</p>
+      </div>
+
+      <nav class="sibling-links">
+        <a href="/daily" class="sibling-link">☀️ Daily</a>
+        <a href="/monthly" class="sibling-link">📆 Monthly</a>
+        <a href="/yearly" class="sibling-link active">📊 Yearly</a>
+      </nav>
+
+      <section class="single-input-section">
+        <article class="card person-card">
+          <div class="card-header"><h2>Birth Details</h2><span class="pill">Full Report</span></div>
+          <label class="profile-select-field"><span>Load Profile</span>
+            <select id="person-profile-select"><option value="">-- Select a saved profile --</option></select>
+          </label>
+          <label><span>Name</span><input type="text" id="person-name" placeholder="Optional name" /></label>
+          <label><span>Date of Birth</span><input type="date" id="person-dob" required /></label>
+          <label><span>Time of Birth</span><input type="time" id="person-time" required /></label>
+          <label class="place-field"><span>Place of Birth</span>
+            <input type="text" id="person-place" autocomplete="off" placeholder="Start typing a city" required />
+            <div class="suggestions hidden" id="person-suggestions"></div>
+          </label>
+        </article>
+      </section>
+
+      <section class="card actions-card" style="max-width:560px;margin:0 auto 22px;">
+        <div class="button-row">
+          <button id="generate-btn" class="primary">Generate Yearly Forecast</button>
+        </div>
+        <p id="status-message" class="status-message"></p>
+      </section>
+
+      <section id="prompt-result" class="card hidden" style="max-width:760px;margin:0 auto;">
+        <div class="prompt-header">
+          <h2>📊 Your Yearly Prompt</h2>
+          <button id="copy-prompt-btn" class="primary" style="padding:0.5rem 1.2rem;font-size:0.88rem;" disabled>📋 Copy Prompt</button>
+        </div>
+        <p class="muted" style="margin-bottom:12px;font-size:0.88rem;">Copy this prompt and paste it into ChatGPT, Claude, or Gemini for your personalized yearly forecast.</p>
+        <div class="prompt-output">
+          <pre id="prompt-text"></pre>
+        </div>
+      </section>
+
+
+    </main>
+    <script>window.PREDICTION_MODE = "yearly";</script>
+    <script src="/assets/predictions.js" defer></script>
+  </body>
+</html>
