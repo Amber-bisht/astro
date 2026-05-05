@@ -37,8 +37,9 @@ A **Vedic astrology marriage compatibility engine** that generates astronomicall
 - Click-to-preview and one-click clipboard copy
 
 ### Other Features
+- **Secure Authentication**: Google OAuth integration with HTTP-only JWT cookies
 - Place autocomplete via geocoding (Nominatim / Google Places)
-- MongoDB profile persistence (optional — auto-saves entered profiles)
+- MongoDB profile persistence (optional — saves entered profiles linked to user accounts)
 - Strict validation on all chart output (no partial data ever returned)
 
 ---
@@ -91,6 +92,10 @@ MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/kundali
 
 # Optional — enables Google Places autocomplete (falls back to Nominatim)
 GOOGLE_PLACES_KEY=your_key_here
+
+# Optional — enables Google OAuth login
+GOOGLE_CLIENT_ID=your_google_oauth_client_id
+JWT_SECRET=your_secure_jwt_secret
 ```
 
 ### Run
@@ -107,13 +112,17 @@ Open [http://localhost:8000](http://localhost:8000).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/` | Serve frontend |
+| `GET` | `/` | Serve frontend (landing page) |
+| `GET` | `/daily`, `/monthly`, `/yearly` | Serve prediction pages |
 | `GET` | `/health` | Server health + geocoding provider status |
 | `GET` | `/places/autocomplete?q=...` | Place search for autocomplete |
 | `POST` | `/guna-milan` | Ashtakoota compatibility score (36-point) |
 | `POST` | `/full-data` | Complete validated charts + Guna Milan + all layers |
-| `GET` | `/profiles` | List saved profiles (requires MongoDB) |
-| `POST` | `/profiles` | Save a profile (requires MongoDB) |
+| `POST` | `/auth/google` | Verify Google ID token and set JWT session |
+| `GET` | `/auth/me` | Get logged-in user details |
+| `POST` | `/auth/logout` | Clear JWT session |
+| `GET` | `/profiles` | List saved profiles for logged-in user |
+| `POST` | `/profiles` | Save a profile to the logged-in user's account |
 
 ### Request Format (`/full-data` and `/guna-milan`)
 
