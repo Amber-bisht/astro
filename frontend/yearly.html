@@ -6,6 +6,7 @@
     <title>Yearly Forecast — Vedic Astrology</title>
     <meta name="description" content="Get your personalized Vedic yearly forecast with career, money, love, health, and quarter-by-quarter breakdown." />
     <link rel="stylesheet" href="/assets/style.css" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
       .back-link {
         display: inline-flex; align-items: center; gap: 6px;
@@ -35,6 +36,7 @@
   </head>
   <body>
     <main class="page-shell">
+      <nav class="navbar" id="app-navbar"></nav>
       <a href="/" class="back-link">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Back to Home
@@ -88,6 +90,7 @@
 
     </main>
     <script>window.PREDICTION_MODE = "yearly";</script>
+    <script src="/assets/auth.js" defer></script>
     <script src="/assets/predictions.js" defer></script>
   </body>
 </html>

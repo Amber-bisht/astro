@@ -102,6 +102,17 @@ async function handleGenerate() {
     el.promptResult.classList.remove("hidden");
     el.copyBtn.disabled = false;
     showStatus("Prompt ready — copy and paste into ChatGPT.");
+
+    // Auto-save profile if logged in and name is provided
+    if (person.name && typeof AUTH !== "undefined" && AUTH.isLoggedIn()) {
+      try {
+        await fetch("/profiles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(person),
+        });
+      } catch { /* silent fail */ }
+    }
     refreshProfiles();
   } catch (e) {
     showStatus(e.message, true);

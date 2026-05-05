@@ -6,6 +6,7 @@
     <title>Kundli / Birth Chart — Vedic Astrology</title>
     <meta name="description" content="Generate a complete Vedic Birth Chart (Kundli) with planetary positions, Navamsa (D9), Vimshottari Dasha, doshas, and transit analysis." />
     <link rel="stylesheet" href="/assets/style.css" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
       .back-link {
         display: inline-flex;
@@ -34,6 +35,7 @@
   </head>
   <body>
     <main class="page-shell">
+      <nav class="navbar" id="app-navbar"></nav>
       <a href="/" class="back-link">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Back to Home
@@ -128,6 +130,7 @@
 
     </main>
 
+    <script src="/assets/auth.js" defer></script>
     <script src="/assets/single.js" defer></script>
   </body>
 </html>

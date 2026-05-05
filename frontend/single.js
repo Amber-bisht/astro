@@ -97,6 +97,17 @@ async function handleGenerate() {
     renderPromptPanel(response);
     el.copyBtn.disabled = false;
     showStatus("Birth chart generated.");
+
+    // Auto-save profile if logged in and name is provided
+    if (payload.name && typeof AUTH !== "undefined" && AUTH.isLoggedIn()) {
+      try {
+        await fetch("/profiles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } catch { /* silent fail */ }
+    }
     refreshProfiles();
   } catch (error) {
     showStatus(error.message, true);

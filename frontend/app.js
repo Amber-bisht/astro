@@ -114,7 +114,8 @@ async function handleCompatibility() {
     const response = await fetchJson("/guna-milan", payload);
     renderCompatibility(response);
     showStatus("Compatibility calculated.");
-    refreshProfiles(); // Refresh in case new profile was auto-saved
+    await _autoSaveMatchProfiles(payload);
+    refreshProfiles();
   } catch (error) {
     showStatus(error.message, true);
   } finally {
@@ -132,11 +133,26 @@ async function handleFullData() {
     renderPromptPanel(response);
     elements.copyButton.disabled = false;
     showStatus("Full chart data generated.");
-    refreshProfiles(); // Refresh in case new profile was auto-saved
+    await _autoSaveMatchProfiles(payload);
+    refreshProfiles();
   } catch (error) {
     showStatus(error.message, true);
   } finally {
     setBusy(false);
+  }
+}
+
+async function _autoSaveMatchProfiles(payload) {
+  if (typeof AUTH === "undefined" || !AUTH.isLoggedIn()) return;
+  for (const person of [payload.boy, payload.girl]) {
+    if (!person.name) continue;
+    try {
+      await fetch("/profiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(person),
+      });
+    } catch { /* silent */ }
   }
 }
 
