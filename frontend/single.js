@@ -401,6 +401,8 @@ const PROMPT_CATEGORIES = [
   { id: "marriage", icon: "💍", title: "Marriage & Relationships", desc: "Partnership potential and timing", buildPrompt: buildMarriagePrompt },
   { id: "health", icon: "💪", title: "Health & Longevity", desc: "Health risks and remedies", buildPrompt: buildHealthPrompt },
   { id: "overall", icon: "⚡", title: "Overall Life Analysis", desc: "Complete life reading with all areas", buildPrompt: buildOverallPrompt },
+  { id: "lifeblueprint", icon: "🎯", title: "Life Improvement Blueprint", desc: "Score /100, career domain & role, health, personality, love, social, do's & don'ts", buildPrompt: buildLifeBlueprintPrompt },
+  { id: "family", icon: "👨‍👩‍👧‍👦", title: "Family & Relationships", desc: "Spouse, children, mother, father, family bonds", buildPrompt: buildFamilyPrompt },
 ];
 
 let activePromptText = "";
@@ -554,6 +556,163 @@ function buildHealthPrompt(data) {
 
 function buildOverallPrompt(data) {
   return `${SYSTEM_PROMPT}\n\n====== CHART DATA ======\n\n${chartBlock(data)}\n\n====== ANALYSIS REQUEST ======\n\nGive a COMPREHENSIVE life analysis covering ALL areas:\n\n1. **🧠 Personality** — Core nature, strengths, weaknesses\n2. **💼 Career & Wealth** — Professional path, earning capacity, financial peaks\n3. **💍 Marriage & Relationships** — Spouse nature, timing, married life quality\n4. **👶 Children** — 5th house analysis, progeny prospects, timing\n5. **💪 Health** — Physical and mental health indicators, risks\n6. **⏰ Key Life Periods** — Important Dasha transitions, major life events\n\nFor EACH section, give a clear tier rating:\n⭐ Excellent / ✅ Good / ⚠️ Average / ❌ Challenging / 🚫 Serious Concern\n\n7. **⚡ OVERALL LIFE ASSESSMENT**: Summarize the chart's overall strength, biggest blessings, and areas needing remedies. Be honest and practical.`;
+}
+
+function buildLifeBlueprintPrompt(data) {
+  return `${SYSTEM_PROMPT}
+
+ADDITIONAL RULES FOR THIS PROMPT:
+- Give a LIFE SCORE out of 100 based on overall chart strength.
+- Be ACTIONABLE — tell the native exactly what to START DOING from today.
+- For career, be PRECISE — suggest specific domains, roles, and company types (startup vs MNC vs govt vs freelance).
+- Don't just describe problems — give SOLUTIONS and daily habits.
+- Use simple language a 20-year-old can understand.
+
+====== CHART DATA ======
+
+${chartBlock(data)}
+
+====== ANALYSIS REQUEST ======
+
+Create a COMPLETE LIFE IMPROVEMENT BLUEPRINT for this person. Be brutally honest and deeply practical.
+
+## 1. 🏆 OVERALL LIFE SCORE: ___ / 100
+Break down into sub-scores:
+- Career Potential: __/15
+- Wealth & Money: __/15
+- Health & Energy: __/15
+- Love & Marriage: __/15
+- Personality & Charisma: __/10
+- Social Life & Network: __/10
+- Family Bonds: __/10
+- Spiritual Growth: __/10
+
+## 2. 💼 CAREER — Be VERY Precise
+- **Best Domains**: List 3-5 specific industries/fields (e.g., "fintech", "data science", "real estate", "healthcare", "content creation").
+- **Best Roles**: List specific job titles that suit this chart (e.g., "product manager", "surgeon", "investment banker", "creative director").
+- **Work Style**: Should they be in a startup, MNC, government, freelance, or own business? Why?
+- **Company Culture Fit**: What kind of boss/team works best? What office politics to watch for?
+- **Career Dangers**: What mistakes will they naturally make in career? How to avoid them?
+- **What to START doing NOW**: 3 concrete career actions for this month.
+
+## 3. 💪 HEALTH — How to Improve
+- **Weak Body Areas**: Which organs/systems are vulnerable based on afflicted planets?
+- **Diet Recommendations**: Specific foods to eat and avoid based on planetary constitution.
+- **Exercise Type**: What physical activity suits their chart (yoga, gym, swimming, martial arts, running)?
+- **Mental Health**: Stress patterns, anxiety triggers, and how to manage them.
+- **Sleep & Routine**: Best wake-up time and daily routine based on their ruling planet.
+- **What to START doing NOW**: 3 concrete health actions for this week.
+
+## 4. 🧠 PERSONALITY — How to Improve
+- **Top 3 Strengths**: What natural gifts to double down on.
+- **Top 3 Weaknesses**: What flaws to actively work on (anger, laziness, overthinking, etc.).
+- **Communication Style**: How they come across vs how they should communicate.
+- **Confidence & Charisma**: Specific tips to boost presence based on Lagna & Sun.
+- **Bad Habits to Break**: Planetary patterns that create addictions or negative loops.
+- **What to START doing NOW**: 3 personality development actions.
+
+## 5. ❤️ LOVE LIFE — How to Improve
+- **Attraction Pattern**: What type of partner they naturally attract (good or bad).
+- **Relationship Mistakes**: Common patterns that sabotage their love life.
+- **Ideal Partner Traits**: What to look for based on 7th house and Venus.
+- **Red Flags to Avoid**: Types of partners that will cause suffering.
+- **Romance Tips**: How to be a better partner based on their Venus & Moon.
+- **What to START doing NOW**: 3 actions to improve love life.
+
+## 6. 🤝 SOCIAL LIFE — How to Improve
+- **Natural Social Style**: Introvert/extrovert/ambivert tendencies from chart.
+- **Networking Strength**: 11th house analysis — how to grow their circle.
+- **Friend Quality**: Do they attract genuine friends or users? How to filter.
+- **Public Image**: How others perceive them vs reality.
+- **What to START doing NOW**: 3 social life actions.
+
+## 7. 🏠 FAMILY BONDS — Quick Overview
+- **Relationship with Parents**: 4th house (mother) and 9th/10th house (father) brief analysis.
+- **How to Strengthen Family Ties**: Practical tips.
+
+## 8. ✅ MASTER DO's LIST (Top 10)
+List the 10 most important things this person MUST do based on their chart. Be specific (e.g., "Wear a yellow sapphire on Thursday", "Wake up before 6 AM", "Avoid partnerships in business").
+
+## 9. 🚫 MASTER DON'Ts LIST (Top 10)
+List the 10 things this person must ABSOLUTELY AVOID. Be specific (e.g., "Never invest in speculative markets during Rahu Dasha", "Avoid alcohol — Moon is weak", "Don't take loans between ages 28-32").
+
+## 10. 📅 NEXT 12 MONTHS — Action Plan
+Based on current Dasha + Transits, what should they focus on in the next 12 months? Month-by-month is ideal, or at least quarter-by-quarter.`;
+}
+
+function buildFamilyPrompt(data) {
+  return `${SYSTEM_PROMPT}
+
+ADDITIONAL RULES FOR THIS PROMPT:
+- Analyze EACH family member separately with dedicated sections.
+- Be specific about the NATURE, BEHAVIOR, and RELATIONSHIP DYNAMICS.
+- Give practical advice on how to improve each relationship.
+- Include timing of key family events.
+
+====== CHART DATA ======
+
+${chartBlock(data)}
+
+====== ANALYSIS REQUEST ======
+
+Give a DEEP ANALYSIS of family and close relationships based on this birth chart.
+
+## 1. 💍 SPOUSE / WIFE / HUSBAND — Detailed Analysis
+- **Spouse Appearance & Nature**: Based on 7th house sign, lord, and Venus — what will the spouse look like? Personality traits?
+- **Spouse Family Background**: 7th lord placement — wealthy family? Educated? Traditional or modern?
+- **Spouse Career**: Will the spouse be working? In what field?
+- **Married Life Quality**: Day-to-day married life — harmonious or conflicted? Reasons.
+- **Physical Intimacy**: 8th house and Mars/Venus analysis for romantic and physical compatibility.
+- **Potential Problems in Marriage**: What issues will arise? In-law problems? Trust issues? Financial disagreements?
+- **Divorce/Separation Risk**: Any indicators? How to prevent them.
+- **How to Be a Better Spouse**: Based on chart weaknesses, what should this person work on?
+- **Best Marriage Age/Period**: Precise Dasha-based timing.
+- **Rating**: ⭐/✅/⚠️/❌/🚫
+
+## 2. 👶 CHILDREN — Detailed Analysis
+- **Number of Children**: Traditional indicators from 5th house.
+- **Gender Indicators**: Any lean towards sons or daughters?
+- **First Child Timing**: Based on 5th house lord Dasha periods.
+- **Children's Nature**: What kind of children will they have? Obedient, rebellious, talented?
+- **Children's Success**: Will children be successful? In which fields?
+- **Relationship with Children**: Close bond or distant? Communication issues?
+- **Challenges with Children**: Health concerns, behavioral issues, or delays in childbirth.
+- **How to Be a Better Parent**: Chart-based parenting advice.
+- **Rating**: ⭐/✅/⚠️/❌/🚫
+
+## 3. 👩 MOTHER — Detailed Analysis (4th House)
+- **Mother's Nature & Health**: Based on 4th house and Moon.
+- **Relationship Quality**: Is the bond with mother strong or strained? Why?
+- **Mother's Influence**: How has the mother shaped this person's personality and decisions?
+- **Mother's Health Concerns**: Any planetary indicators for mother's health issues?
+- **How to Strengthen This Bond**: Practical remedies and behavioral changes.
+- **Rating**: ⭐/✅/⚠️/❌/🚫
+
+## 4. 👨 FATHER — Detailed Analysis (9th & 10th House)
+- **Father's Nature & Career**: Based on 9th house, 10th house, and Sun.
+- **Relationship Quality**: Close and supportive or distant and authoritarian?
+- **Father's Financial Status**: Did/will father provide financial stability?
+- **Father's Health Concerns**: Sun afflictions and 9th house analysis.
+- **Inheritance & Property**: Will this person inherit from father? 4th house + 8th house.
+- **How to Strengthen This Bond**: Practical advice.
+- **Rating**: ⭐/✅/⚠️/❌/🚫
+
+## 5. 👫 SIBLINGS — Brief Analysis (3rd House)
+- **Number of Siblings**: Indicators from 3rd house.
+- **Relationship Quality**: Supportive or rivalry?
+- **Sibling Success**: Will siblings be successful?
+
+## 6. 🏡 OVERALL FAMILY HAPPINESS
+- **4th House Sukha (Happiness)**: Overall domestic peace and comfort.
+- **Property & Home**: Will they own property? When?
+- **Joint Family vs Nuclear**: What setup works better for this chart?
+- **Family Reputation**: 10th house influence on family standing in society.
+
+## 7. 💎 REMEDIES FOR FAMILY HARMONY
+- **Gemstones**: Specific stones to strengthen family relationships.
+- **Mantras**: Daily recitations for family peace.
+- **Behavioral Changes**: 3 things to change immediately to improve family bonds.
+- **Auspicious Activities**: Specific rituals or donations that strengthen family karma.`;
 }
 
 // ===== UTILITIES =====
