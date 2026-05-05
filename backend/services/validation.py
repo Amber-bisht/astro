@@ -39,10 +39,12 @@ def validate_full_chart_object(chart: dict[str, Any]) -> None:
         raise IncompleteChartDataError("Planet strength incomplete")
 
     doshas = chart["doshas"]
-    _require_keys(doshas, {"manglik", "nadi", "bhakoot"})
+    _require_keys(doshas, {"manglik", "nadi"})
     _require_non_empty(doshas["manglik"], {"present", "mars_house", "severity", "cancellation"})
     _require_non_empty(doshas["nadi"], {"type"})
-    _require_non_empty(doshas["bhakoot"], {"rashi_distance", "compatible"})
+    # Bhakoot is only present in pair (matching) charts
+    if "bhakoot" in doshas:
+        _require_non_empty(doshas["bhakoot"], {"rashi_distance", "compatible"})
 
     house_scores = chart["house_scores"]
     _require_non_empty(house_scores, REQUIRED_HOUSE_SCORES)

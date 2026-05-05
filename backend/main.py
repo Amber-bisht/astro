@@ -19,7 +19,7 @@ MONGODB_URI = os.getenv("MONGODB_URI")
 db_client = AsyncIOMotorClient(MONGODB_URI) if MONGODB_URI else None
 db = db_client.get_default_database() if db_client else None
 
-from backend.services.chart_builder import build_pair_charts
+from backend.services.chart_builder import build_pair_charts, build_single_chart
 from backend.services.geocoding import (
     GeocodingService,
     LocationResolutionError,
@@ -91,6 +91,16 @@ async def request_error_handler(_, exc: requests.RequestException):
 @app.get("/")
 async def index() -> FileResponse:
     return FileResponse(FRONTEND_DIR / "index.html")
+
+
+@app.get("/matching")
+async def matching_page() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "matching.html")
+
+
+@app.get("/kundli")
+async def kundli_page() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "single.html")
 
 
 @app.get("/health")
@@ -195,6 +205,35 @@ async def full_data(payload: CompatibilityRequest) -> dict:
     charts["guna_milan"] = guna_milan_result
 
     return charts
+
+
+@app.post("/single-chart")
+async def single_chart(payload: PersonInput) -> dict:
+    resolved = geocoding_service.resolve_birth_details(
+        name=payload.name,
+        dob=_parse_date(payload.dob),
+        time_value=payload.time,
+        time_accuracy=payload.time_accuracy,
+        place_input=_serialize_place(payload.place),
+    )
+
+    # Auto-save profile if name is present
+    if db is not None and payload.name:
+        data = payload.model_dump(exclude_none=True)
+        await db.profiles.update_one({"name": payload.name}, {"$set": data}, upsert=True)
+
+    chart_data = build_single_chart(resolved)
+
+    return {
+        "chart": chart_data,
+        "meta": {
+            "lat": resolved.place.lat,
+            "lon": resolved.place.lon,
+            "timezone": resolved.local_datetime.tzname(),
+            "label": resolved.place.label,
+            "is_lmt": resolved.is_lmt,
+        },
+    }
 
 
 def _resolve_people(payload: CompatibilityRequest):

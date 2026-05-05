@@ -45,6 +45,16 @@ def build_pair_charts(boy_birth: ResolvedBirthData, girl_birth: ResolvedBirthDat
     return {"boy": boy_bundle.data, "girl": girl_bundle.data}
 
 
+def build_single_chart(birth: ResolvedBirthData) -> dict[str, Any]:
+    """Build a fully enriched chart for a single person (no pairwise doshas)."""
+    bundle = build_chart_bundle(birth)
+    _enrich_chart(bundle)
+    # Remove bhakoot from doshas since there is no partner to compare
+    bundle.data["doshas"].pop("bhakoot", None)
+    validate_full_chart_object(bundle.data)
+    return bundle.data
+
+
 def _enrich_chart(bundle: ChartBundle) -> None:
     # Aspects must be computed first — house_scores uses them.
     bundle.data["aspects"] = compute_aspects(bundle)
