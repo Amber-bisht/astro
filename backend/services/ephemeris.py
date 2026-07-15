@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from functools import lru_cache
 from math import floor
 from typing import Any
+import copy
 
 import swisseph as swe
 
@@ -345,7 +347,8 @@ class ChartBundle:
     planet_strengths: dict[str, str]
 
 
-def build_chart_bundle(resolved_birth: ResolvedBirthData) -> ChartBundle:
+@lru_cache(maxsize=128)
+def _build_chart_bundle_cached(resolved_birth: ResolvedBirthData) -> ChartBundle:
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     utc_dt = resolved_birth.utc_datetime
     _, julian_day_ut = swe.utc_to_jd(
@@ -509,6 +512,12 @@ def build_chart_bundle(resolved_birth: ResolvedBirthData) -> ChartBundle:
         planet_houses=planet_houses,
         planet_strengths=planet_strengths,
     )
+
+
+def build_chart_bundle(resolved_birth: ResolvedBirthData) -> ChartBundle:
+    """Returns a deep copy of the cached chart bundle to protect against downstream mutations."""
+    return copy.deepcopy(_build_chart_bundle_cached(resolved_birth))
+
 
 
 def normalize_longitude(value: float) -> float:

@@ -280,13 +280,13 @@ async def save_profile(
 
 
 @app.get("/places/autocomplete")
-async def autocomplete(q: str = Query(..., min_length=2, max_length=120)) -> dict[str, object]:
+def autocomplete(q: str = Query(..., min_length=2, max_length=120)) -> dict[str, object]:
     results = geocoding_service.autocomplete(q)
     return {"results": results, "provider": geocoding_service.provider_name}
 
 
 @app.post("/guna-milan")
-async def guna_milan(payload: CompatibilityRequest) -> dict:
+def guna_milan(payload: CompatibilityRequest) -> dict:
     boy_resolved, girl_resolved = _resolve_people(payload)
     boy_chart = build_chart_bundle(boy_resolved)
     girl_chart = build_chart_bundle(girl_resolved)
@@ -317,7 +317,7 @@ async def guna_milan(payload: CompatibilityRequest) -> dict:
 
 
 @app.post("/full-data")
-async def full_data(payload: CompatibilityRequest) -> dict:
+def full_data(payload: CompatibilityRequest) -> dict:
     boy_resolved, girl_resolved = _resolve_people(payload)
     
     # Auto-save profiles if names are present and user is logged in
@@ -335,7 +335,7 @@ async def full_data(payload: CompatibilityRequest) -> dict:
 
 
 @app.post("/single-chart")
-async def single_chart(payload: PersonInput) -> dict:
+def single_chart(payload: PersonInput) -> dict:
     resolved = geocoding_service.resolve_birth_details(
         name=payload.name,
         dob=_parse_date(payload.dob),
