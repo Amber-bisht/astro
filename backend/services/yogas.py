@@ -19,6 +19,7 @@ from backend.services.ephemeris import (
     PLANET_ORDER,
     SIGN_LORDS,
     SIGNS,
+    OWN_SIGNS,
 )
 
 # Houses classified by Parashara
@@ -95,10 +96,13 @@ def _detect_raj_yogas(bundle: ChartBundle) -> list[dict[str, Any]]:
             if k_planet_house is None or t_planet_house is None:
                 continue
 
+            if k_key not in bundle.data["planets"] or t_key not in bundle.data["planets"]:
+                continue
+
             # Conjunction: both lords in same house
             if k_planet_house == t_planet_house:
                 yogas.append({
-                    "name": "Raj Yoga",
+                    "name": "Raj Yoga (Conjunction)",
                     "type": "raj",
                     "strength": "strong",
                     "description": (
@@ -108,18 +112,49 @@ def _detect_raj_yogas(bundle: ChartBundle) -> list[dict[str, Any]]:
                     "planets": [k_lord, t_lord],
                 })
 
-            # Exchange: kendra lord in trikona house, trikona lord in kendra house
-            elif k_planet_house in TRIKONA_HOUSES and t_planet_house in KENDRA_HOUSES:
-                yogas.append({
-                    "name": "Raj Yoga (Exchange)",
-                    "type": "raj",
-                    "strength": "moderate",
-                    "description": (
-                        f"{k_lord} (H{k_house_str} lord) in Trikona H{k_planet_house}, "
-                        f"{t_lord} (H{t_house_str} lord) in Kendra H{t_planet_house}"
-                    ),
-                    "planets": [k_lord, t_lord],
-                })
+            else:
+                k_sign = bundle.data["planets"][k_key]["sign"]
+                t_sign = bundle.data["planets"][t_key]["sign"]
+                
+                is_parivartana = (
+                    k_sign in OWN_SIGNS.get(t_lord, set()) and
+                    t_sign in OWN_SIGNS.get(k_lord, set())
+                )
+
+                aspects_given = bundle.data.get("aspects", {}).get("aspects_given", {})
+                k_aspects = aspects_given.get(k_key, [])
+                t_aspects = aspects_given.get(t_key, [])
+                
+                is_mutual_aspect = (
+                    t_planet_house in k_aspects and
+                    k_planet_house in t_aspects
+                )
+
+                # Sign Exchange: kendra lord in trikona sign, trikona lord in kendra sign
+                if is_parivartana:
+                    yogas.append({
+                        "name": "Raj Yoga (Sign Exchange)",
+                        "type": "raj",
+                        "strength": "strong",
+                        "description": (
+                            f"{k_lord} (H{k_house_str} lord) and "
+                            f"{t_lord} (H{t_house_str} lord) in sign exchange (Parivartana)"
+                        ),
+                        "planets": [k_lord, t_lord],
+                    })
+
+                # Mutual Aspect: kendra lord and trikona lord aspecting each other
+                elif is_mutual_aspect:
+                    yogas.append({
+                        "name": "Raj Yoga (Mutual Aspect)",
+                        "type": "raj",
+                        "strength": "moderate",
+                        "description": (
+                            f"{k_lord} (H{k_house_str} lord) in H{k_planet_house} and "
+                            f"{t_lord} (H{t_house_str} lord) in H{t_planet_house} mutually aspecting"
+                        ),
+                        "planets": [k_lord, t_lord],
+                    })
 
     # Deduplicate (same pair can appear via multiple house combos)
     seen: set[str] = set()
@@ -224,11 +259,13 @@ def _detect_neechabhanga(bundle: ChartBundle) -> list[dict[str, Any]]:
     A debilitated planet's dosha is cancelled if:
     1. Lord of the debilitation sign is in a Kendra from Lagna or Moon.
     2. Lord of the exaltation sign is in a Kendra from Lagna or Moon.
-    3. The debilitated planet itself is in a Kendra.
+    3. The debilitated planet itself is in a Kendra from Lagna or Moon.
     """
     from backend.services.ephemeris import DEBILITATION_SIGNS, EXALTATION_SIGNS, DISPLAY_TO_KEY
 
     yogas: list[dict[str, Any]] = []
+    moon_house = bundle.planet_houses["moon"]
+
     for planet_key in PLANET_ORDER:
         strength = bundle.data["planet_strength"].get(planet_key, "")
         if strength != "debilitated":
@@ -239,19 +276,42 @@ def _detect_neechabhanga(bundle: ChartBundle) -> list[dict[str, Any]]:
         sign = bundle.data["planets"][planet_key]["sign"]
         sign_lord = SIGN_LORDS[sign]
 
+        # Calculate house offset from Moon
+        house_from_moon = ((house - moon_house) % 12) + 1
+
         # Check cancellation conditions
         cancellation_reason = None
 
-        # Condition 1: Debilitation sign lord in Kendra from Lagna
-        lord_key = DISPLAY_TO_KEY.get(sign_lord)
-        if lord_key and lord_key in bundle.planet_houses:
-            lord_house = bundle.planet_houses[lord_key]
-            if lord_house in KENDRA_HOUSES:
-                cancellation_reason = f"{sign_lord} (lord of {sign}) in Kendra H{lord_house}"
+        # Condition 1: Planet itself in Kendra from Lagna or Moon
+        if house in KENDRA_HOUSES:
+            cancellation_reason = f"{label} itself is in Kendra from Lagna (H{house})"
+        elif house_from_moon in KENDRA_HOUSES:
+            cancellation_reason = f"{label} itself is in Kendra from Moon (H{house_from_moon} from Moon)"
 
-        # Condition 2: Planet itself in Kendra
-        if cancellation_reason is None and house in KENDRA_HOUSES:
-            cancellation_reason = f"{label} in Kendra H{house}"
+        # Condition 2: Debilitation sign lord in Kendra from Lagna or Moon
+        if cancellation_reason is None:
+            lord_key = DISPLAY_TO_KEY.get(sign_lord)
+            if lord_key and lord_key in bundle.planet_houses:
+                lord_house = bundle.planet_houses[lord_key]
+                lord_house_from_moon = ((lord_house - moon_house) % 12) + 1
+                if lord_house in KENDRA_HOUSES:
+                    cancellation_reason = f"Debilitation lord {sign_lord} is in Kendra from Lagna (H{lord_house})"
+                elif lord_house_from_moon in KENDRA_HOUSES:
+                    cancellation_reason = f"Debilitation lord {sign_lord} is in Kendra from Moon (H{lord_house_from_moon} from Moon)"
+
+        # Condition 3: Lord of the exaltation sign in Kendra from Lagna or Moon
+        if cancellation_reason is None:
+            exaltation_sign = EXALTATION_SIGNS.get(label)
+            if exaltation_sign:
+                ex_lord = SIGN_LORDS[exaltation_sign]
+                ex_lord_key = DISPLAY_TO_KEY.get(ex_lord)
+                if ex_lord_key and ex_lord_key in bundle.planet_houses:
+                    ex_lord_house = bundle.planet_houses[ex_lord_key]
+                    ex_lord_house_from_moon = ((ex_lord_house - moon_house) % 12) + 1
+                    if ex_lord_house in KENDRA_HOUSES:
+                        cancellation_reason = f"Exaltation lord {ex_lord} is in Kendra from Lagna (H{ex_lord_house})"
+                    elif ex_lord_house_from_moon in KENDRA_HOUSES:
+                        cancellation_reason = f"Exaltation lord {ex_lord} is in Kendra from Moon (H{ex_lord_house_from_moon} from Moon)"
 
         if cancellation_reason:
             yogas.append({
@@ -265,41 +325,50 @@ def _detect_neechabhanga(bundle: ChartBundle) -> list[dict[str, Any]]:
 
 
 def _detect_viparita_raj(bundle: ChartBundle) -> list[dict[str, Any]]:
-    """Viparita Raj Yoga: Lords of 6th, 8th, 12th in each other's houses."""
+    """Viparita Raj Yoga: Lords of 6th, 8th, or 12th houses in 6th, 8th, or 12th houses."""
     lords = bundle.data["lords_mapping"]
     houses = bundle.planet_houses
 
     from backend.services.ephemeris import DISPLAY_TO_KEY
 
-    dusthana_lord_info: dict[int, tuple[str, int | None]] = {}
-    for h in DUSTHANA_HOUSES:
-        lord = lords[str(h)]
-        key = DISPLAY_TO_KEY.get(lord)
-        current_house = houses.get(key) if key else None
-        dusthana_lord_info[h] = (lord, current_house)
-
     yogas: list[dict[str, Any]] = []
-    dusthana_list = sorted(DUSTHANA_HOUSES)
-    for i in range(len(dusthana_list)):
-        for j in range(i + 1, len(dusthana_list)):
-            h1, h2 = dusthana_list[i], dusthana_list[j]
-            lord1, house1 = dusthana_lord_info[h1]
-            lord2, house2 = dusthana_lord_info[h2]
-            if lord1 == lord2:
-                continue
-            # Lord of one dusthana in another dusthana
-            if house1 is not None and house1 in DUSTHANA_HOUSES:
-                if house2 is not None and house2 in DUSTHANA_HOUSES:
-                    yogas.append({
-                        "name": "Viparita Raj Yoga",
-                        "type": "special",
-                        "strength": "moderate",
-                        "description": (
-                            f"{lord1} (H{h1} lord) in H{house1}, "
-                            f"{lord2} (H{h2} lord) in H{house2}"
-                        ),
-                        "planets": [lord1, lord2],
-                    })
+    
+    # 6th lord -> Harsha Yoga
+    lord_6 = lords["6"]
+    key_6 = DISPLAY_TO_KEY.get(lord_6)
+    if key_6 and houses.get(key_6) in DUSTHANA_HOUSES:
+        yogas.append({
+            "name": "Harsha Viparita Raj Yoga",
+            "type": "special",
+            "strength": "moderate",
+            "description": f"6th lord {lord_6} is placed in dusthana H{houses[key_6]}",
+            "planets": [lord_6],
+        })
+
+    # 8th lord -> Sarala Yoga
+    lord_8 = lords["8"]
+    key_8 = DISPLAY_TO_KEY.get(lord_8)
+    if key_8 and houses.get(key_8) in DUSTHANA_HOUSES:
+        yogas.append({
+            "name": "Sarala Viparita Raj Yoga",
+            "type": "special",
+            "strength": "moderate",
+            "description": f"8th lord {lord_8} is placed in dusthana H{houses[key_8]}",
+            "planets": [lord_8],
+        })
+
+    # 12th lord -> Vimala Yoga
+    lord_12 = lords["12"]
+    key_12 = DISPLAY_TO_KEY.get(lord_12)
+    if key_12 and houses.get(key_12) in DUSTHANA_HOUSES:
+        yogas.append({
+            "name": "Vimala Viparita Raj Yoga",
+            "type": "special",
+            "strength": "moderate",
+            "description": f"12th lord {lord_12} is placed in dusthana H{houses[key_12]}",
+            "planets": [lord_12],
+        })
+
     return yogas
 
 

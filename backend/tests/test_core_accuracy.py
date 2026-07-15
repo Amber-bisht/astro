@@ -273,5 +273,227 @@ class TestKundaliReliability(unittest.TestCase):
         self.assertFalse(is_planet_benefic("Mercury", longitudes_mercury_saturn))
         self.assertTrue(is_planet_malefic("Mercury", longitudes_mercury_saturn))
 
+    def test_combustion_check(self):
+        """Verify that planetary combustion logic works correctly."""
+        # Gandhi birth data as reference for bundle creation
+        resolved = ResolvedBirthData(
+            name="Porbandar LMT",
+            dob=date(1869, 10, 2),
+            birth_time=time(7, 12),
+            time_accuracy="exact",
+            place=ResolvedPlace("Porbandar", 21.6417, 69.6293, "Asia/Kolkata"),
+            local_datetime=datetime(1869, 10, 2, 7, 12),
+            utc_datetime=datetime(1869, 10, 2, 2, 33, 50, tzinfo=timezone.utc),
+            is_lmt=True
+        )
+        bundle = build_chart_bundle(resolved)
+        # Verify that Sun and Rahu/Ketu are not marked combust
+        self.assertFalse(bundle.data["planets"]["sun"]["is_combust"])
+        self.assertFalse(bundle.data["planets"]["rahu"]["is_combust"])
+        self.assertFalse(bundle.data["planets"]["ketu"]["is_combust"])
+
+    def test_neechabhanga_moon_kendra(self):
+        """Verify that Neechabhanga is detected if the debilitated planet is in a Kendra from the Moon."""
+        from backend.services.yogas import _detect_neechabhanga
+        
+        bundle = MagicMock()
+        bundle.planet_houses = {
+            "sun": 2,       # Sun in H2 (not Kendra from Lagna)
+            "moon": 11,     # Moon in H11 from Lagna
+            "mars": 1,
+            "mercury": 1,
+            "jupiter": 1,
+            "venus": 1,
+            "saturn": 1,
+            "rahu": 1,
+            "ketu": 1
+        }
+        bundle.data = {
+            "planet_strength": {"sun": "debilitated"},
+            "planets": {
+                "sun": {"sign": "Libra"}
+            }
+        }
+        
+        # Sun (H2) is in a Kendra from the Moon (H11) since ((2 - 11) % 12) + 1 = 4.
+        yogas = _detect_neechabhanga(bundle)
+        self.assertEqual(len(yogas), 1)
+        self.assertEqual(yogas[0]["name"], "Neechabhanga Raj Yoga")
+        self.assertIn("Kendra from Moon", yogas[0]["description"])
+
+    def test_independent_viparita_yogas(self):
+        """Verify that Harsha, Sarala, and Vimala Yogas are detected independently."""
+        from backend.services.yogas import _detect_viparita_raj
+        
+        bundle = MagicMock()
+        # 6th lord in 8th house (dusthana)
+        bundle.data = {
+            "lords_mapping": {
+                "6": "Mars",
+                "8": "Mercury",
+                "12": "Saturn"
+            }
+        }
+        bundle.planet_houses = {
+            "mars": 8,       # 6th lord Mars in 8th house
+            "mercury": 1,    # 8th lord in 1st house (not dusthana)
+            "saturn": 1      # 12th lord in 1st house
+        }
+        
+        yogas = _detect_viparita_raj(bundle)
+        self.assertEqual(len(yogas), 1)
+        self.assertEqual(yogas[0]["name"], "Harsha Viparita Raj Yoga")
+
+    def test_raj_yoga_mutual_aspect_and_exchange(self):
+        """Verify sign exchange (Parivartana) and mutual aspects form Kendra-Trikona Raj Yogas."""
+        from backend.services.yogas import _detect_raj_yogas
+        
+        bundle = MagicMock()
+        # H1 (Kendra) lord Mars in Scorpio (own sign, but let's test exchange)
+        # H5 (Trikona) lord Sun
+        bundle.data = {
+            "lords_mapping": {
+                "1": "Mars",
+                "4": "Venus",
+                "7": "Venus",
+                "10": "Saturn",
+                "5": "Sun",
+                "9": "Jupiter"
+            },
+            "planets": {
+                "mars": {"sign": "Leo"},  # Mars (H1 lord) in Leo (Sun's sign)
+                "sun": {"sign": "Aries"}   # Sun (H5 lord) in Aries (Mars's sign)
+            },
+            "aspects": {
+                "aspects_given": {
+                    "mars": [],
+                    "sun": []
+                }
+            }
+        }
+        bundle.planet_houses = {
+            "mars": 5,
+            "sun": 1,
+            "venus": 1,
+            "saturn": 1,
+            "jupiter": 1,
+            "rahu": 1,
+            "ketu": 1
+        }
+        
+        yogas = _detect_raj_yogas(bundle)
+        names = [y["name"] for y in yogas]
+        self.assertIn("Raj Yoga (Sign Exchange)", names)
+
+    def test_multi_chart_manglik(self):
+        """Verify Manglik Dosha checks relative to Lagna, Moon, and Venus."""
+        from backend.services.chart_builder import compute_manglik
+        
+        bundle = MagicMock()
+        bundle.planet_houses = {
+            "mars": 5,      # Mars in H5 from Lagna (Not Manglik from Lagna)
+            "moon": 11,     # Moon in H11 from Lagna -> Mars is in H7 from Moon ((5 - 11) % 12 + 1 = 7)
+            "venus": 1,
+            "jupiter": 1
+        }
+        bundle.planet_sign_indices = {
+            "mars": 4,      # Leo
+            "moon": 10,     # Aquarius
+            "venus": 0      # Aries
+        }
+        bundle.data = {
+            "planet_strength": {"mars": "neutral"},
+            "aspects": {
+                "aspects_given": {
+                    "jupiter": []
+                }
+            }
+        }
+        
+        res = compute_manglik(bundle, partner=None)
+        self.assertTrue(res["present"])
+        self.assertTrue(res["moon_manglik"])
+        self.assertFalse(res["lagna_manglik"])
+        self.assertEqual(res["severity"], "high") # Mars is in 7th from Moon
+
+    def test_complex_chart_integration_gandhi(self):
+        """Perform a complex integration test using Mahatma Gandhi's birth data."""
+        # Gandhi: Oct 2, 1869, 07:12 AM, Porbandar (69.6293E, 21.6417N)
+        resolved = ResolvedBirthData(
+            name="Mahatma Gandhi",
+            dob=date(1869, 10, 2),
+            birth_time=time(7, 12),
+            time_accuracy="exact",
+            place=ResolvedPlace("Porbandar", 21.6417, 69.6293, "Asia/Kolkata"),
+            local_datetime=datetime(1869, 10, 2, 7, 12),
+            utc_datetime=datetime(1869, 10, 2, 2, 33, 50, tzinfo=timezone.utc),
+            is_lmt=True
+        )
+        
+        from backend.services.chart_builder import build_single_chart
+        chart = build_single_chart(resolved)
+        
+        # 1. Assert basic placements
+        self.assertEqual(chart["core_identity"]["lagna"], "Libra")
+        self.assertEqual(chart["core_identity"]["moon_sign"], "Cancer")
+        
+        # 2. Check Bhava Chalit shifts:
+        for p_key, payload in chart["planets"].items():
+            self.assertIn("bhava_house", payload)
+            self.assertIn("is_combust", payload)
+            
+        # 3. Yogas check:
+        yoga_names = [y["name"] for y in chart["yogas"]]
+        # Gandhi has Gajakesari Yoga (Jupiter in Aries H7, Moon in Cancer H10)
+        self.assertIn("Gajakesari Yoga", yoga_names)
+        
+        # 4. Combustion check for Gandhi:
+        self.assertIn("is_combust", chart["planets"]["mercury"])
+        
+        # 5. Manglik Dosha:
+        self.assertTrue(chart["doshas"]["manglik"]["present"])
+        self.assertTrue(chart["doshas"]["manglik"]["lagna_manglik"])
+        self.assertTrue(chart["doshas"]["manglik"]["cancellation"]) # Aspect of Jupiter cancels it!
+        self.assertEqual(chart["doshas"]["manglik"]["severity"], "low") # low because it is cancelled!
+
+    def test_modern_ist_modi(self):
+        """Verify calculations for a modern Indian birth after timezone standardization."""
+        # Narendra Modi: Sept 17, 1950, 11:00 AM, Vadnagar, Gujarat, India (~72.64, 23.78)
+        resolved = ResolvedBirthData(
+            name="Narendra Modi",
+            dob=date(1950, 9, 17),
+            birth_time=time(11, 0),
+            time_accuracy="exact",
+            place=ResolvedPlace("Vadnagar", 23.7844, 72.6375, "Asia/Kolkata"),
+            local_datetime=datetime(1950, 9, 17, 11, 0, tzinfo=ZoneInfo("Asia/Kolkata")),
+            utc_datetime=datetime(1950, 9, 17, 5, 30, tzinfo=timezone.utc),
+            is_lmt=False
+        )
+        bundle = build_chart_bundle(resolved)
+        # Verify basic placements:
+        # Modi is Scorpio Lagna, Scorpio Moon (Vrischika) under Lahiri
+        self.assertEqual(bundle.data["core_identity"]["moon_sign"], "Scorpio")
+        self.assertEqual(bundle.data["core_identity"]["lagna"], "Scorpio")
+        self.assertFalse(bundle.resolved_birth.is_lmt)
+
+    def test_foreign_obama(self):
+        """Verify calculations for a foreign birth (Honolulu, Hawaii, USA)."""
+        # Barack Obama: Aug 4, 1961, 7:24 PM (19:24), Honolulu, Hawaii, USA (~ -157.86, 21.31)
+        resolved = ResolvedBirthData(
+            name="Barack Obama",
+            dob=date(1961, 8, 4),
+            birth_time=time(19, 24),
+            time_accuracy="exact",
+            place=ResolvedPlace("Honolulu", 21.3069, -157.8583, "Pacific/Honolulu"),
+            local_datetime=datetime(1961, 8, 4, 19, 24, tzinfo=ZoneInfo("Pacific/Honolulu")),
+            utc_datetime=datetime(1961, 8, 5, 5, 24, tzinfo=timezone.utc),
+            is_lmt=False
+        )
+        bundle = build_chart_bundle(resolved)
+        # Vedic Placements: Capricorn Lagna (Makar) and Taurus Moon (Vrishabha)
+        self.assertEqual(bundle.data["core_identity"]["lagna"], "Capricorn")
+        self.assertEqual(bundle.data["core_identity"]["moon_sign"], "Taurus")
+        self.assertFalse(bundle.resolved_birth.is_lmt)
+
 if __name__ == '__main__':
     unittest.main()

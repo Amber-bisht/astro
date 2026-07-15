@@ -164,18 +164,66 @@ def score_house(bundle: ChartBundle, house_number: int) -> dict[str, Any]:
 
 def compute_manglik(bundle: ChartBundle, partner: ChartBundle | None) -> dict[str, Any]:
     mars_house = bundle.planet_houses["mars"]
-    # Include 2nd house per South Indian tradition
-    present = mars_house in {1, 2, 4, 7, 8, 12}
+    
+    mars_sign_index = bundle.planet_sign_indices["mars"]
+    moon_sign_index = bundle.planet_sign_indices["moon"]
+    venus_sign_index = bundle.planet_sign_indices["venus"]
+    
+    mars_house_moon = ((mars_sign_index - moon_sign_index) % 12) + 1
+    mars_house_venus = ((mars_sign_index - venus_sign_index) % 12) + 1
+    
+    lagna_manglik = mars_house in {1, 2, 4, 7, 8, 12}
+    moon_manglik = mars_house_moon in {1, 2, 4, 7, 8, 12}
+    venus_manglik = mars_house_venus in {1, 2, 4, 7, 8, 12}
+    
+    present = lagna_manglik or moon_manglik or venus_manglik
     strength = bundle.data["planet_strength"]["mars"]
+    
+    # 1. Own sign or exalted cancellation
     cancellation = present and strength in {"exalted", "own"}
-    if partner is not None:
-        cancellation = cancellation or (present and partner.planet_houses["mars"] in {1, 2, 4, 7, 8, 12})
+    
+    # 2. Conjunction/Aspect of Jupiter (Jupiter is in same sign as Mars or aspects Mars)
+    if present and not cancellation:
+        jupiter_house = bundle.planet_houses["jupiter"]
+        jupiter_aspects = bundle.data.get("aspects", {}).get("aspects_given", {}).get("jupiter", [])
+        if jupiter_house == mars_house or mars_house in jupiter_aspects:
+            cancellation = True
+            
+    # 3. Partner is also Manglik (mutual cancellation)
+    if partner is not None and present:
+        p_mars_house = partner.planet_houses["mars"]
+        p_mars_sign = partner.planet_sign_indices["mars"]
+        p_moon_sign = partner.planet_sign_indices["moon"]
+        p_venus_sign = partner.planet_sign_indices["venus"]
+        
+        p_mars_house_moon = ((p_mars_sign - p_moon_sign) % 12) + 1
+        p_mars_house_venus = ((p_mars_sign - p_venus_sign) % 12) + 1
+        
+        partner_manglik = (
+            p_mars_house in {1, 2, 4, 7, 8, 12} or
+            p_mars_house_moon in {1, 2, 4, 7, 8, 12} or
+            p_mars_house_venus in {1, 2, 4, 7, 8, 12}
+        )
+        if partner_manglik:
+            cancellation = True
 
     severity = "low"
     if present:
-        severity = "high" if mars_house in {7, 8} else "medium"
-        if mars_house == 2:
-            severity = "mild"  # 2nd house Manglik is less severe
+        placements = []
+        if lagna_manglik:
+            placements.append(mars_house)
+        if moon_manglik:
+            placements.append(mars_house_moon)
+        if venus_manglik:
+            placements.append(mars_house_venus)
+            
+        if any(h in {7, 8} for h in placements):
+            severity = "high"
+        elif all(h == 2 for h in placements):
+            severity = "mild"
+        else:
+            severity = "medium"
+            
         if strength in {"exalted", "own"} and severity == "high":
             severity = "medium"
         if cancellation:
@@ -184,6 +232,11 @@ def compute_manglik(bundle: ChartBundle, partner: ChartBundle | None) -> dict[st
     return {
         "present": present,
         "mars_house": mars_house,
+        "mars_house_moon": mars_house_moon,
+        "mars_house_venus": mars_house_venus,
+        "lagna_manglik": lagna_manglik,
+        "moon_manglik": moon_manglik,
+        "venus_manglik": venus_manglik,
         "severity": severity,
         "cancellation": cancellation,
     }

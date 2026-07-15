@@ -310,6 +310,15 @@ NATURAL_RELATIONSHIPS = {
 BENEFIC_PLANETS = {"Moon", "Mercury", "Jupiter", "Venus"}
 MALEFIC_PLANETS = {"Sun", "Mars", "Saturn", "Rahu", "Ketu"}
 
+COMBUSTION_LIMITS = {
+    "moon": 12.0,
+    "mars": 17.0,
+    "mercury": 14.0,  # 12.0 when retro
+    "jupiter": 11.0,
+    "venus": 10.0,    # 8.0 when retro
+    "saturn": 15.0,
+}
+
 def is_planet_benefic(planet_label: str, planet_longitudes: dict[str, float]) -> bool:
     """Dynamically determine if a planet is benefic in the chart."""
     if planet_label in {"Jupiter", "Venus"}:
@@ -436,6 +445,24 @@ def _build_chart_bundle_cached(resolved_birth: ResolvedBirthData) -> ChartBundle
         ascendant_longitude = normalize_longitude(ascmc[0])
         lagna_sign_index = sign_index_from_longitude(ascendant_longitude)
 
+        # Unequal house cusps for Bhava Chalit chart (Placidus with Porphyry fallback)
+        try:
+            chalit_cusps, _ = swe.houses_ex(
+                julian_day_ut,
+                resolved_birth.place.lat,
+                resolved_birth.place.lon,
+                b"P",
+                SIDEREAL_FLAGS,
+            )
+        except swe.Error:
+            chalit_cusps, _ = swe.houses_ex(
+                julian_day_ut,
+                resolved_birth.place.lat,
+                resolved_birth.place.lon,
+                b"O",
+                SIDEREAL_FLAGS,
+            )
+
         planet_longitudes: dict[str, float] = {}
         planet_sign_indices: dict[str, int] = {}
         planet_houses: dict[str, int] = {}
@@ -480,9 +507,27 @@ def _build_chart_bundle_cached(resolved_birth: ResolvedBirthData) -> ChartBundle
             "retro": planet_payload["rahu"]["retro"],
             "speed": planet_payload["rahu"]["speed"],
         }
+        sun_long = planet_longitudes["sun"]
         for p_key in planet_payload:
             label = PLANET_LABELS.get(p_key, p_key.capitalize())
             planet_payload[p_key]["is_benefic"] = is_planet_benefic(label, planet_longitudes)
+
+            # Combustion check
+            if p_key in {"sun", "rahu", "ketu"}:
+                planet_payload[p_key]["is_combust"] = False
+            else:
+                p_long = planet_longitudes[p_key]
+                is_retro = planet_payload[p_key]["retro"]
+                if p_key == "mercury":
+                    limit = 12.0 if is_retro else 14.0
+                elif p_key == "venus":
+                    limit = 8.0 if is_retro else 10.0
+                else:
+                    limit = COMBUSTION_LIMITS.get(p_key, 0.0)
+
+                diff = abs(p_long - sun_long) % 360
+                distance = min(diff, 360 - diff)
+                planet_payload[p_key]["is_combust"] = distance < limit
 
 
     house_payload: dict[str, dict[str, Any]] = {}
@@ -500,11 +545,11 @@ def _build_chart_bundle_cached(resolved_birth: ResolvedBirthData) -> ChartBundle
         lords_mapping[str(house_number)] = lord_name
 
     # --- Bhava Chalit (cusp-based house overlay) ---
-    # cusps[0..11] are the 12 cusp longitudes from swe.houses_ex
+    # chalit_cusps are the 12 unequal cusp longitudes from swe.houses_ex (Placidus/Porphyry)
     bhava_chalit: dict[str, int] = {}
     for planet_key in PLANET_ORDER:
         p_long = planet_longitudes[planet_key]
-        bhava_house = _bhava_chalit_house(p_long, cusps)
+        bhava_house = _bhava_chalit_house(p_long, chalit_cusps)
         bhava_chalit[planet_key] = bhava_house
         # Add bhava_house to planet payload
         planet_payload[planet_key]["bhava_house"] = bhava_house
