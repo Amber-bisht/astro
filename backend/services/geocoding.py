@@ -55,6 +55,7 @@ class ResolvedBirthData:
     local_datetime: datetime
     utc_datetime: datetime
     is_lmt: bool = False
+    year_length: float | None = None
 
 
 class GeocodingService:
@@ -129,6 +130,7 @@ class GeocodingService:
         time_value: str | None,
         time_accuracy: str | None,
         place_input: str | dict[str, Any],
+        year_length: float | None = None,
     ) -> ResolvedBirthData:
         accuracy = self._normalize_time_accuracy(time_value, time_accuracy)
         birth_time = self._parse_birth_time(time_value, accuracy)
@@ -177,6 +179,7 @@ class GeocodingService:
             local_datetime=local_datetime,
             utc_datetime=utc_datetime,
             is_lmt=is_lmt,
+            year_length=year_length,
         )
 
     def _normalize_time_accuracy(self, time_value: str | None, time_accuracy: str | None) -> str:

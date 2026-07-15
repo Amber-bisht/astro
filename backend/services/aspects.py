@@ -13,11 +13,10 @@ from __future__ import annotations
 from typing import Any
 
 from backend.services.ephemeris import (
-    BENEFIC_PLANETS,
     ChartBundle,
-    MALEFIC_PLANETS,
     PLANET_LABELS,
     PLANET_ORDER,
+    is_planet_benefic,
 )
 
 # Offsets from the planet's house (planet house + offset = aspected house).
@@ -58,7 +57,7 @@ def compute_aspects(bundle: ChartBundle) -> dict[str, Any]:
     for planet_key in PLANET_ORDER:
         planet_house = bundle.planet_houses[planet_key]
         label = PLANET_LABELS[planet_key]
-        planet_type = "benefic" if label in BENEFIC_PLANETS else "malefic"
+        planet_type = "benefic" if is_planet_benefic(label, bundle.planet_longitudes) else "malefic"
 
         # Collect all offset values for this planet.
         offsets = [UNIVERSAL_ASPECT_OFFSET]  # 7th aspect

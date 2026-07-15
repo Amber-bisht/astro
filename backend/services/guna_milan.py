@@ -158,8 +158,8 @@ def yoni_score(boy: ChartBundle, girl: ChartBundle) -> dict[str, Any]:
 
 
 def maitri_score(boy: ChartBundle, girl: ChartBundle) -> dict[str, Any]:
-    boy_lord = boy.data["lords_mapping"][str(whole_moon_house(boy))]
-    girl_lord = girl.data["lords_mapping"][str(whole_moon_house(girl))]
+    boy_lord = SIGN_LORDS[boy.data["core_identity"]["moon_sign"]]
+    girl_lord = SIGN_LORDS[girl.data["core_identity"]["moon_sign"]]
     relationship_a = relationship_between(boy_lord, girl_lord)
     relationship_b = relationship_between(girl_lord, boy_lord)
     pair = {relationship_a, relationship_b}
@@ -237,11 +237,12 @@ def _bhakoot_cancellation(boy: ChartBundle, girl: ChartBundle) -> str | None:
     if boy_lord == girl_lord:
         return f"Same rashi lord ({boy_lord})"
 
-    # Rule 2: Rashi lords are mutual natural friends
+    # Rule 2: Rashi lords are friendly or neutral (Graha Maitri score >= 4.0)
     boy_rel = relationship_between(boy_lord, girl_lord)
     girl_rel = relationship_between(girl_lord, boy_lord)
-    if boy_rel == "friend" and girl_rel == "friend":
-        return f"Rashi lords are mutual friends ({boy_lord} & {girl_lord})"
+    pair = {boy_rel, girl_rel}
+    if boy_rel == "same" or girl_rel == "same" or pair == {"friend"} or pair == {"friend", "neutral"}:
+        return f"Rashi lords are friendly or neutral ({boy_lord} & {girl_lord})"
 
     return None
 
@@ -293,6 +294,12 @@ def _nadi_cancellation(boy: ChartBundle, girl: ChartBundle) -> str | None:
     # Rule 3: Same Nakshatra, different Pada
     if boy_nak == girl_nak and boy_pada != girl_pada:
         return f"Same nakshatra ({boy_nak}) but different padas ({boy_pada} vs {girl_pada})"
+
+    # Rule 4: Same Rashi Lord
+    boy_lord = SIGN_LORDS[boy_moon_sign]
+    girl_lord = SIGN_LORDS[girl_moon_sign]
+    if boy_lord == girl_lord:
+        return f"Same rashi lord ({boy_lord})"
 
     return None
 

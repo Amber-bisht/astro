@@ -202,6 +202,9 @@ function collectPerson(person) {
         }
       : { query: placeText };
 
+  const yearLengthElement = document.getElementById("matching-dasha-year");
+  const year_length = yearLengthElement ? parseFloat(yearLengthElement.value) : null;
+
   return {
     name: name || null,
     gender: person === "boy" ? "male" : "female",
@@ -209,6 +212,7 @@ function collectPerson(person) {
     time: timeInput.value,
     time_accuracy: "exact",
     place,
+    year_length,
   };
 }
 
@@ -235,11 +239,13 @@ function renderCompatibility(data) {
     </small>
   `;
 
-  // Render Detailed Table
   elements.breakdownBody.innerHTML = Object.entries(data.breakdown)
     .map(([key, details]) => `
       <tr>
-        <td><strong>${formatLabel(key)}</strong></td>
+        <td>
+          <strong>${formatLabel(key)}</strong>
+          ${details.cancellation ? `<br><small style="color: var(--success); font-size: 0.75rem; display: block; margin-top: 2px;">(Cancelled: ${escapeHtml(details.cancellation)})</small>` : ""}
+        </td>
         <td>${escapeHtml(String(details.boy))}</td>
         <td>${escapeHtml(String(details.girl))}</td>
         <td>${details.max}</td>
@@ -792,7 +798,11 @@ function extractGunaMilan(data) {
   const gm = data.guna_milan;
   const lines = [`Score: ${gm.score}/${gm.max_score} — ${gm.verdict}`];
   for (const [key, details] of Object.entries(gm.breakdown)) {
-    lines.push(`${formatLabel(key)}: ${details.obtained}/${details.max} (Boy: ${details.boy}, Girl: ${details.girl}) — ${details.area}`);
+    let line = `${formatLabel(key)}: ${details.obtained}/${details.max} (Boy: ${details.boy}, Girl: ${details.girl}) — ${details.area}`;
+    if (details.cancellation) {
+      line += ` [Cancelled/Neutralized: ${details.cancellation}]`;
+    }
+    lines.push(line);
   }
   return lines.join("\n");
 }

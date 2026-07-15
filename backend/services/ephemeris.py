@@ -6,10 +6,19 @@ from functools import lru_cache
 from math import floor
 from typing import Any
 import copy
+import threading
+import os
 
 import swisseph as swe
 
 from backend.services.geocoding import ResolvedBirthData
+
+_swe_lock = threading.Lock()
+
+# Set Swiss Ephemeris data files path if specified in environment variable or local folder exists
+EPHE_PATH = os.getenv("EPHE_PATH") or os.path.join(os.path.dirname(os.path.dirname(__file__)), "ephe")
+if os.path.isdir(EPHE_PATH):
+    swe.set_ephe_path(EPHE_PATH)
 
 
 SIGNS = [
@@ -301,6 +310,61 @@ NATURAL_RELATIONSHIPS = {
 BENEFIC_PLANETS = {"Moon", "Mercury", "Jupiter", "Venus"}
 MALEFIC_PLANETS = {"Sun", "Mars", "Saturn", "Rahu", "Ketu"}
 
+def is_planet_benefic(planet_label: str, planet_longitudes: dict[str, float]) -> bool:
+    """Dynamically determine if a planet is benefic in the chart."""
+    if planet_label in {"Jupiter", "Venus"}:
+        return True
+    if planet_label in {"Sun", "Mars", "Saturn", "Rahu", "Ketu"}:
+        return False
+
+    if planet_label == "Moon":
+        # Moon is benefic if its elongation from the Sun is between 90 and 270 degrees
+        sun_long = planet_longitudes.get("sun", 0.0)
+        moon_long = planet_longitudes.get("moon", 0.0)
+        elongation = (moon_long - sun_long) % 360
+        return 90.0 <= elongation <= 270.0
+
+    if planet_label == "Mercury":
+        # Mercury is malefic if conjunct with a malefic planet, unless also conjunct with a benefic
+        mercury_long = planet_longitudes.get("mercury")
+        if mercury_long is None:
+            return True
+        mercury_sign = sign_index_from_longitude(mercury_long)
+        
+        malefics_conjunct = False
+        benefics_conjunct = False
+        
+        for p_key, p_long in planet_longitudes.items():
+            if p_key == "mercury":
+                continue
+            if sign_index_from_longitude(p_long) == mercury_sign:
+                p_label = PLANET_LABELS.get(p_key)
+                if p_label in {"Sun", "Mars", "Saturn", "Rahu", "Ketu"}:
+                    malefics_conjunct = True
+                elif p_label in {"Jupiter", "Venus"}:
+                    benefics_conjunct = True
+                elif p_label == "Moon":
+                    # Check if Moon is bright/benefic
+                    if is_planet_benefic("Moon", planet_longitudes):
+                        benefics_conjunct = True
+                    else:
+                        malefics_conjunct = True
+                        
+        if malefics_conjunct and not benefics_conjunct:
+            return False
+        return True
+
+    return False
+
+
+def is_planet_malefic(planet_label: str, planet_longitudes: dict[str, float]) -> bool:
+    """Dynamically determine if a planet is malefic in the chart."""
+    if planet_label in {"Sun", "Mars", "Saturn", "Rahu", "Ketu"}:
+        return True
+    if planet_label in {"Jupiter", "Venus"}:
+        return False
+    return not is_planet_benefic(planet_label, planet_longitudes)
+
 # Panchadha Maitri — compound relationship from Natural + Temporary
 # Temporary relationship: planets in houses 2,3,4,10,11,12 from a planet
 # are temporary friends; planets in 1,5,6,7,8,9 are temporary enemies.
@@ -349,72 +413,73 @@ class ChartBundle:
 
 @lru_cache(maxsize=128)
 def _build_chart_bundle_cached(resolved_birth: ResolvedBirthData) -> ChartBundle:
-    swe.set_sid_mode(swe.SIDM_LAHIRI)
-    utc_dt = resolved_birth.utc_datetime
-    _, julian_day_ut = swe.utc_to_jd(
-        utc_dt.year,
-        utc_dt.month,
-        utc_dt.day,
-        utc_dt.hour,
-        utc_dt.minute,
-        utc_dt.second + utc_dt.microsecond / 1_000_000,
-        swe.GREG_CAL,
-    )
+    with _swe_lock:
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+        utc_dt = resolved_birth.utc_datetime
+        _, julian_day_ut = swe.utc_to_jd(
+            utc_dt.year,
+            utc_dt.month,
+            utc_dt.day,
+            utc_dt.hour,
+            utc_dt.minute,
+            utc_dt.second + utc_dt.microsecond / 1_000_000,
+            swe.GREG_CAL,
+        )
 
-    cusps, ascmc = swe.houses_ex(
-        julian_day_ut,
-        resolved_birth.place.lat,
-        resolved_birth.place.lon,
-        b"W",
-        SIDEREAL_FLAGS,
-    )
-    ascendant_longitude = normalize_longitude(ascmc[0])
-    lagna_sign_index = sign_index_from_longitude(ascendant_longitude)
+        cusps, ascmc = swe.houses_ex(
+            julian_day_ut,
+            resolved_birth.place.lat,
+            resolved_birth.place.lon,
+            b"W",
+            SIDEREAL_FLAGS,
+        )
+        ascendant_longitude = normalize_longitude(ascmc[0])
+        lagna_sign_index = sign_index_from_longitude(ascendant_longitude)
 
-    planet_longitudes: dict[str, float] = {}
-    planet_sign_indices: dict[str, int] = {}
-    planet_houses: dict[str, int] = {}
-    planet_payload: dict[str, dict[str, Any]] = {}
+        planet_longitudes: dict[str, float] = {}
+        planet_sign_indices: dict[str, int] = {}
+        planet_houses: dict[str, int] = {}
+        planet_payload: dict[str, dict[str, Any]] = {}
 
-    for planet_key, swiss_id in SWISS_PLANETS.items():
-        values, _ = swe.calc_ut(julian_day_ut, swiss_id, SIDEREAL_FLAGS)
-        longitude = normalize_longitude(values[0])
-        speed = round(values[3], 6)
-        sign_index = sign_index_from_longitude(longitude)
-        house = whole_sign_house(sign_index, lagna_sign_index)
-        nakshatra_name, nakshatra_index, pada = get_nakshatra(longitude)
-        planet_longitudes[planet_key] = longitude
-        planet_sign_indices[planet_key] = sign_index
-        planet_houses[planet_key] = house
-        planet_payload[planet_key] = {
-            "sign": SIGNS[sign_index],
-            "house": house,
-            "degree": round(degree_in_sign(longitude), 4),
-            "longitude": round(longitude, 4),
-            "nakshatra": nakshatra_name,
-            "pada": pada,
-            "retro": speed < 0,
-            "speed": speed,
+        for planet_key, swiss_id in SWISS_PLANETS.items():
+            values, _ = swe.calc_ut(julian_day_ut, swiss_id, SIDEREAL_FLAGS)
+            longitude = normalize_longitude(values[0])
+            speed = round(values[3], 6)
+            sign_index = sign_index_from_longitude(longitude)
+            house = whole_sign_house(sign_index, lagna_sign_index)
+            nakshatra_name, nakshatra_index, pada = get_nakshatra(longitude)
+            planet_longitudes[planet_key] = longitude
+            planet_sign_indices[planet_key] = sign_index
+            planet_houses[planet_key] = house
+            planet_payload[planet_key] = {
+                "sign": SIGNS[sign_index],
+                "house": house,
+                "degree": round(degree_in_sign(longitude), 4),
+                "longitude": round(longitude, 4),
+                "nakshatra": nakshatra_name,
+                "pada": pada,
+                "retro": speed < 0,
+                "speed": speed,
+            }
+
+        rahu_longitude = planet_longitudes["rahu"]
+        ketu_longitude = normalize_longitude(rahu_longitude + 180)
+        ketu_sign_index = sign_index_from_longitude(ketu_longitude)
+        ketu_house = whole_sign_house(ketu_sign_index, lagna_sign_index)
+        ketu_nakshatra, _, ketu_pada = get_nakshatra(ketu_longitude)
+        planet_longitudes["ketu"] = ketu_longitude
+        planet_sign_indices["ketu"] = ketu_sign_index
+        planet_houses["ketu"] = ketu_house
+        planet_payload["ketu"] = {
+            "sign": SIGNS[ketu_sign_index],
+            "house": ketu_house,
+            "degree": round(degree_in_sign(ketu_longitude), 4),
+            "longitude": round(ketu_longitude, 4),
+            "nakshatra": ketu_nakshatra,
+            "pada": ketu_pada,
+            "retro": planet_payload["rahu"]["retro"],
+            "speed": planet_payload["rahu"]["speed"],
         }
-
-    rahu_longitude = planet_longitudes["rahu"]
-    ketu_longitude = normalize_longitude(rahu_longitude + 180)
-    ketu_sign_index = sign_index_from_longitude(ketu_longitude)
-    ketu_house = whole_sign_house(ketu_sign_index, lagna_sign_index)
-    ketu_nakshatra, _, ketu_pada = get_nakshatra(ketu_longitude)
-    planet_longitudes["ketu"] = ketu_longitude
-    planet_sign_indices["ketu"] = ketu_sign_index
-    planet_houses["ketu"] = ketu_house
-    planet_payload["ketu"] = {
-        "sign": SIGNS[ketu_sign_index],
-        "house": ketu_house,
-        "degree": round(degree_in_sign(ketu_longitude), 4),
-        "longitude": round(ketu_longitude, 4),
-        "nakshatra": ketu_nakshatra,
-        "pada": ketu_pada,
-        "retro": planet_payload["rahu"]["retro"],
-        "speed": planet_payload["rahu"]["speed"],
-    }
 
     house_payload: dict[str, dict[str, Any]] = {}
     lords_mapping: dict[str, str] = {}
@@ -704,39 +769,40 @@ def compute_transit_snapshot(lagna_sign_index: int) -> dict[str, dict[str, Any]]
     """
     from datetime import datetime, timezone as _tz
 
-    swe.set_sid_mode(swe.SIDM_LAHIRI)
-    now = datetime.now(tz=_tz.utc)
-    _, jd_ut = swe.utc_to_jd(
-        now.year, now.month, now.day,
-        now.hour, now.minute,
-        now.second + now.microsecond / 1_000_000,
-        swe.GREG_CAL,
-    )
+    with _swe_lock:
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+        now = datetime.now(tz=_tz.utc)
+        _, jd_ut = swe.utc_to_jd(
+            now.year, now.month, now.day,
+            now.hour, now.minute,
+            now.second + now.microsecond / 1_000_000,
+            swe.GREG_CAL,
+        )
 
-    transit_planets = {
-        "jupiter": swe.JUPITER,
-        "saturn": swe.SATURN,
-        "mars": swe.MARS,
-        "rahu": swe.TRUE_NODE,
-    }
-    snapshot: dict[str, dict[str, Any]] = {}
-
-    for key, swiss_id in transit_planets.items():
-        values, _ = swe.calc_ut(jd_ut, swiss_id, SIDEREAL_FLAGS)
-        longitude = normalize_longitude(values[0])
-        speed = round(values[3], 6)
-        sign_idx = sign_index_from_longitude(longitude)
-        nak_name, _, nak_pada = get_nakshatra(longitude)
-        house = whole_sign_house(sign_idx, lagna_sign_index)
-
-        snapshot[key] = {
-            "sign": SIGNS[sign_idx],
-            "degree": round(degree_in_sign(longitude), 4),
-            "nakshatra": nak_name,
-            "pada": nak_pada,
-            "retro": speed < 0,
-            "transit_house": house,
+        transit_planets = {
+            "jupiter": swe.JUPITER,
+            "saturn": swe.SATURN,
+            "mars": swe.MARS,
+            "rahu": swe.TRUE_NODE,
         }
+        snapshot: dict[str, dict[str, Any]] = {}
+
+        for key, swiss_id in transit_planets.items():
+            values, _ = swe.calc_ut(jd_ut, swiss_id, SIDEREAL_FLAGS)
+            longitude = normalize_longitude(values[0])
+            speed = round(values[3], 6)
+            sign_idx = sign_index_from_longitude(longitude)
+            nak_name, _, nak_pada = get_nakshatra(longitude)
+            house = whole_sign_house(sign_idx, lagna_sign_index)
+
+            snapshot[key] = {
+                "sign": SIGNS[sign_idx],
+                "degree": round(degree_in_sign(longitude), 4),
+                "nakshatra": nak_name,
+                "pada": nak_pada,
+                "retro": speed < 0,
+                "transit_house": house,
+            }
 
     # Ketu is always 180° from Rahu
     rahu_data = snapshot["rahu"]

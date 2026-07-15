@@ -103,6 +103,17 @@
       </section>
 
       <section class="card actions-card">
+        <div style="margin-bottom: 20px; display: grid; grid-template-columns: 1fr; gap: 8px;">
+          <label style="max-width: 320px;">
+            <span>Dasha Year Length</span>
+            <select id="matching-dasha-year">
+              <option value="365.242199">Standard Solar (365.24 days)</option>
+              <option value="360.0">Savana (360 days)</option>
+              <option value="365.25">Julian (365.25 days)</option>
+              <option value="365.25636">Astronomical Sidereal (365.26 days)</option>
+            </select>
+          </label>
+        </div>
         <div class="button-row">
           <button id="calculate-btn" class="primary">Calculate Compatibility (/36)</button>
           <button id="full-data-btn" class="secondary">Generate Full Data (Advanced)</button>

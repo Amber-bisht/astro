@@ -18,7 +18,7 @@ DASHA_YEARS = {
     "Saturn": 19,
     "Mercury": 17,
 }
-DASHA_YEAR_DAYS = 365.25636
+DASHA_YEAR_DAYS = 365.242199
 
 
 @dataclass(frozen=True)
@@ -53,33 +53,39 @@ class DashaBundle:
     pratyantardasha_periods: list[PratyantardashaPeriod]
 
 
-def build_vimshottari_dasha(moon_longitude: float, birth_dt: datetime, reference_dt: datetime | None = None) -> DashaBundle:
+def build_vimshottari_dasha(
+    moon_longitude: float,
+    birth_dt: datetime,
+    reference_dt: datetime | None = None,
+    year_length: float | None = None,
+) -> DashaBundle:
+    year_days = year_length if year_length is not None else DASHA_YEAR_DAYS
     reference_dt = reference_dt or datetime.now(tz=timezone.utc)
     nakshatra_index = int(moon_longitude / NAKSHATRA_SPAN)
     mahadasha_lord = DASHA_ORDER[nakshatra_index % len(DASHA_ORDER)]
     degrees_into_nakshatra = moon_longitude % NAKSHATRA_SPAN
     remaining_fraction = (NAKSHATRA_SPAN - degrees_into_nakshatra) / NAKSHATRA_SPAN
-    total_major_days = DASHA_YEARS[mahadasha_lord] * DASHA_YEAR_DAYS
+    total_major_days = DASHA_YEARS[mahadasha_lord] * year_days
     elapsed_major_days = total_major_days * (1 - remaining_fraction)
     cycle_start = birth_dt - timedelta(days=elapsed_major_days)
-
+ 
     major_periods: list[DashaPeriod] = []
     current_start = cycle_start
     start_index = DASHA_ORDER.index(mahadasha_lord)
     for offset in range(len(DASHA_ORDER)):
         lord = DASHA_ORDER[(start_index + offset) % len(DASHA_ORDER)]
-        duration = timedelta(days=DASHA_YEARS[lord] * DASHA_YEAR_DAYS)
+        duration = timedelta(days=DASHA_YEARS[lord] * year_days)
         end = current_start + duration
         major_periods.append(DashaPeriod(planet=lord, start=current_start, end=end))
         current_start = end
-
+ 
     antardasha_periods: list[AntardashaPeriod] = []
     for major in major_periods:
         major_index = DASHA_ORDER.index(major.planet)
         current_sub_start = major.start
         for offset in range(len(DASHA_ORDER)):
             sub_lord = DASHA_ORDER[(major_index + offset) % len(DASHA_ORDER)]
-            duration_days = DASHA_YEARS[major.planet] * DASHA_YEARS[sub_lord] * DASHA_YEAR_DAYS / 120
+            duration_days = DASHA_YEARS[major.planet] * DASHA_YEARS[sub_lord] * year_days / 120
             current_sub_end = current_sub_start + timedelta(days=duration_days)
             antardasha_periods.append(
                 AntardashaPeriod(
@@ -90,7 +96,7 @@ def build_vimshottari_dasha(moon_longitude: float, birth_dt: datetime, reference
                 )
             )
             current_sub_start = current_sub_end
-
+ 
     # --- Pratyantardasha (3rd level) ---
     pratyantardasha_periods: list[PratyantardashaPeriod] = []
     for ad in antardasha_periods:
@@ -103,7 +109,7 @@ def build_vimshottari_dasha(moon_longitude: float, birth_dt: datetime, reference
                 DASHA_YEARS[ad.mahadasha]
                 * DASHA_YEARS[ad.antardasha]
                 * DASHA_YEARS[pd_lord]
-                * DASHA_YEAR_DAYS
+                * year_days
                 / 14400  # 120 * 120
             )
             pd_end = pd_start + timedelta(days=pd_days)

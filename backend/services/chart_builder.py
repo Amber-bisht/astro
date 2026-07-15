@@ -7,17 +7,17 @@ from backend.services.aspects import compute_aspects
 from backend.services.ashtakvarga import compute_ashtakvarga, get_transit_bindu
 from backend.services.dasha import DashaBundle, build_vimshottari_dasha
 from backend.services.ephemeris import (
-    BENEFIC_PLANETS,
     ChartBundle,
     COMPOUND_STRENGTH_WEIGHTS,
     DISPLAY_TO_KEY,
-    MALEFIC_PLANETS,
     PLANET_LABELS,
     PLANET_ORDER,
     SIGNS,
     build_chart_bundle,
     compute_transit_snapshot,
     sign_index_from_longitude,
+    is_planet_benefic,
+    is_planet_malefic,
 )
 from backend.services.geocoding import ResolvedBirthData
 from backend.services.guna_milan import bhakoot_compatible, bhakoot_distance, get_nadi_type
@@ -57,7 +57,11 @@ def _enrich_chart(bundle: ChartBundle) -> None:
     # Aspects must be computed first — house_scores uses them.
     bundle.data["aspects"] = compute_aspects(bundle)
     bundle.data["house_scores"] = compute_house_scores(bundle)
-    dasha_bundle = build_vimshottari_dasha(bundle.moon_longitude, bundle.resolved_birth.utc_datetime)
+    dasha_bundle = build_vimshottari_dasha(
+        bundle.moon_longitude,
+        bundle.resolved_birth.utc_datetime,
+        year_length=bundle.resolved_birth.year_length,
+    )
     bundle.data["dasha"] = dasha_bundle.public
     bundle.data["derived_windows"] = derive_windows(bundle, dasha_bundle)
     bundle.data["doshas"] = {
@@ -131,10 +135,10 @@ def score_house(bundle: ChartBundle, house_number: int) -> dict[str, Any]:
     malefic_occupants: list[str] = []
     for occupant in occupants:
         occupant_key = DISPLAY_TO_KEY[occupant]
-        if occupant in BENEFIC_PLANETS:
+        if is_planet_benefic(occupant, bundle.planet_longitudes):
             score += 0.6
             benefic_occupants.append(occupant)
-        elif occupant in MALEFIC_PLANETS:
+        elif is_planet_malefic(occupant, bundle.planet_longitudes):
             score -= 0.6
             malefic_occupants.append(occupant)
         if occupant_key == lord_key:

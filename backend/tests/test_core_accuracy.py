@@ -4,7 +4,21 @@ from unittest.mock import patch, MagicMock
 from zoneinfo import ZoneInfo
 
 from backend.services.geocoding import GeocodingService, ResolvedPlace
-from backend.services.ephemeris import build_chart_bundle, ResolvedBirthData
+from backend.services.ephemeris import (
+    build_chart_bundle,
+    ResolvedBirthData,
+    is_planet_benefic,
+    is_planet_malefic,
+    ChartBundle,
+)
+from backend.services.yogas import _detect_kaal_sarpa
+from backend.services.guna_milan import (
+    _nadi_cancellation,
+    _bhakoot_cancellation,
+    nadi_score,
+    bhakoot_score,
+)
+from backend.services.dasha import build_vimshottari_dasha
 
 class TestKundaliReliability(unittest.TestCase):
     def setUp(self):
@@ -145,6 +159,119 @@ class TestKundaliReliability(unittest.TestCase):
                 self.assertAlmostEqual(offset, 22778, delta=10)
                 self.assertTrue(res.is_lmt)
                 self.assertEqual(res.local_datetime.tzname(), "LMT")
+
+    def test_kaal_sarpa_yoga_both_directions(self):
+        """Verify Kaal Sarpa Yoga detects hemmed planets in both sectors."""
+        # 1. Sector 1 (Rahu -> Ketu)
+        longitudes_1 = {
+            "rahu": 30.0,
+            "ketu": 210.0,
+            "sun": 45.0,
+            "moon": 60.0,
+            "mars": 90.0,
+            "mercury": 120.0,
+            "jupiter": 150.0,
+            "venus": 180.0,
+            "saturn": 200.0,
+        }
+        bundle_1 = MagicMock()
+        bundle_1.planet_longitudes = longitudes_1
+        yogas_1 = _detect_kaal_sarpa(bundle_1)
+        self.assertEqual(len(yogas_1), 1)
+        self.assertEqual(yogas_1[0]["name"], "Kaal Sarpa Yoga")
+
+        # 2. Sector 2 (Ketu -> Rahu)
+        longitudes_2 = {
+            "rahu": 30.0,
+            "ketu": 210.0,
+            "sun": 220.0,
+            "moon": 240.0,
+            "mars": 270.0,
+            "mercury": 300.0,
+            "jupiter": 330.0,
+            "venus": 0.0,
+            "saturn": 15.0,
+        }
+        bundle_2 = MagicMock()
+        bundle_2.planet_longitudes = longitudes_2
+        yogas_2 = _detect_kaal_sarpa(bundle_2)
+        self.assertEqual(len(yogas_2), 1)
+        self.assertEqual(yogas_2[0]["name"], "Kaal Sarpa Yoga")
+
+    def test_nadi_same_rashi_lord_cancellation(self):
+        """Verify Nadi dosha is cancelled when rashi lords are the same."""
+        boy = MagicMock()
+        boy.data = {
+            "core_identity": {
+                "moon_sign": "Aries",
+                "nakshatra": "Ashwini",
+                "nakshatra_pada": 1,
+            }
+        }
+        girl = MagicMock()
+        girl.data = {
+            "core_identity": {
+                "moon_sign": "Scorpio",
+                "nakshatra": "Ashlesha",
+                "nakshatra_pada": 2,
+            }
+        }
+        # Aries and Scorpio are both ruled by Mars
+        cancellation = _nadi_cancellation(boy, girl)
+        self.assertEqual(cancellation, "Same rashi lord (Mars)")
+
+    def test_bhakoot_friendly_lord_cancellation(self):
+        """Verify Bhakoot dosha is cancelled for friendly Moon-Jupiter Rashi lords."""
+        boy = MagicMock()
+        boy.data = {
+            "core_identity": {
+                "moon_sign": "Cancer"
+            }
+        }
+        girl = MagicMock()
+        girl.data = {
+            "core_identity": {
+                "moon_sign": "Sagittarius"
+            }
+        }
+        cancellation = _bhakoot_cancellation(boy, girl)
+        self.assertIsNotNone(cancellation)
+        self.assertIn("friendly or neutral", cancellation)
+
+    def test_vimshottari_dasha_custom_year_length(self):
+        """Verify Vimshottari Dasha calculations honor custom year lengths."""
+        # Moon at 0.0 (beginning of Ketu)
+        dasha_365 = build_vimshottari_dasha(0.0, datetime(2000, 1, 1, tzinfo=timezone.utc), year_length=365.0)
+        dasha_360 = build_vimshottari_dasha(0.0, datetime(2000, 1, 1, tzinfo=timezone.utc), year_length=360.0)
+        
+        # Ketu is 7 years.
+        # Duration for 365-day year: 7 * 365 = 2555 days
+        # Duration for 360-day year: 7 * 360 = 2520 days
+        diff_365 = (dasha_365.major_periods[0].end - dasha_365.major_periods[0].start).days
+        diff_360 = (dasha_360.major_periods[0].end - dasha_360.major_periods[0].start).days
+        self.assertEqual(diff_365, 2555)
+        self.assertEqual(diff_360, 2520)
+
+    def test_dynamic_planet_benefic_malefic(self):
+        """Verify dynamic Moon and Mercury benefic/malefic classifications."""
+        # 1. Moon bright (180 deg elongation from Sun)
+        longitudes_bright = {"sun": 0.0, "moon": 180.0}
+        self.assertTrue(is_planet_benefic("Moon", longitudes_bright))
+        self.assertFalse(is_planet_malefic("Moon", longitudes_bright))
+
+        # 2. Moon dark (10 deg elongation from Sun)
+        longitudes_dark = {"sun": 0.0, "moon": 10.0}
+        self.assertFalse(is_planet_benefic("Moon", longitudes_dark))
+        self.assertTrue(is_planet_malefic("Moon", longitudes_dark))
+
+        # 3. Mercury alone (benefic)
+        longitudes_mercury_alone = {"mercury": 45.0, "sun": 120.0}
+        self.assertTrue(is_planet_benefic("Mercury", longitudes_mercury_alone))
+
+        # 4. Mercury conjunct Saturn (malefic)
+        longitudes_mercury_saturn = {"mercury": 45.0, "saturn": 50.0}  # Same sign (Taurus)
+        self.assertFalse(is_planet_benefic("Mercury", longitudes_mercury_saturn))
+        self.assertTrue(is_planet_malefic("Mercury", longitudes_mercury_saturn))
 
 if __name__ == '__main__':
     unittest.main()

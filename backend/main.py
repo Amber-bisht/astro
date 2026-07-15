@@ -56,6 +56,7 @@ class PersonInput(BaseModel):
     time: str
     time_accuracy: Optional[Literal["exact", "approx"]] = "exact"
     place: Union[str, PlaceInput]
+    year_length: Optional[float] = None
 
 
 class CompatibilityRequest(BaseModel):
@@ -342,6 +343,7 @@ def single_chart(payload: PersonInput) -> dict:
         time_value=payload.time,
         time_accuracy=payload.time_accuracy,
         place_input=_serialize_place(payload.place),
+        year_length=payload.year_length,
     )
 
     # Auto-save profile if name is present and user is logged in
@@ -369,6 +371,7 @@ def _resolve_people(payload: CompatibilityRequest):
             time_value=payload.boy.time,
             time_accuracy=payload.boy.time_accuracy,
             place_input=_serialize_place(payload.boy.place),
+            year_length=payload.boy.year_length,
         ),
         geocoding_service.resolve_birth_details(
             name=payload.girl.name,
@@ -376,6 +379,7 @@ def _resolve_people(payload: CompatibilityRequest):
             time_value=payload.girl.time,
             time_accuracy=payload.girl.time_accuracy,
             place_input=_serialize_place(payload.girl.place),
+            year_length=payload.girl.year_length,
         ),
     )
 

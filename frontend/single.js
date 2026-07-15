@@ -142,7 +142,10 @@ function collectPerson() {
       ? { label: selectedPlace.label, lat: selectedPlace.lat, lon: selectedPlace.lon, timezone: selectedPlace.timezone }
       : { query: placeText };
 
-  return { name: name || null, dob, time, time_accuracy: "exact", place };
+  const yearLengthElement = document.getElementById("dasha-year-length");
+  const year_length = yearLengthElement ? parseFloat(yearLengthElement.value) : null;
+
+  return { name: name || null, dob, time, time_accuracy: "exact", place, year_length };
 }
 
 function renderChart(data) {

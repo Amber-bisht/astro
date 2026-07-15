@@ -304,30 +304,42 @@ def _detect_viparita_raj(bundle: ChartBundle) -> list[dict[str, Any]]:
 
 
 def _detect_kaal_sarpa(bundle: ChartBundle) -> list[dict[str, Any]]:
-    """Kaal Sarpa Yoga: All 7 planets between Rahu-Ketu axis."""
+    """Kaal Sarpa Yoga: All 7 planets between Rahu-Ketu axis (on either side)."""
     rahu_long = bundle.planet_longitudes.get("rahu")
     ketu_long = bundle.planet_longitudes.get("ketu")
     if rahu_long is None or ketu_long is None:
         return []
 
     check_planets = ["sun", "moon", "mars", "mercury", "jupiter", "venus", "saturn"]
-    all_between = True
+    
+    all_in_sec1 = True  # Rahu -> Ketu
+    all_in_sec2 = True  # Ketu -> Rahu
 
     for p_key in check_planets:
         p_long = bundle.planet_longitudes.get(p_key)
         if p_long is None:
-            all_between = False
-            break
-        # Check if planet is between Rahu and Ketu (going forward from Rahu)
-        if rahu_long < ketu_long:
-            between = rahu_long <= p_long <= ketu_long
-        else:
-            between = p_long >= rahu_long or p_long <= ketu_long
-        if not between:
-            all_between = False
+            all_in_sec1 = False
+            all_in_sec2 = False
             break
 
-    if all_between:
+        # Sector 1: Rahu -> Ketu
+        if rahu_long < ketu_long:
+            in_sec1 = rahu_long <= p_long <= ketu_long
+        else:
+            in_sec1 = p_long >= rahu_long or p_long <= ketu_long
+
+        # Sector 2: Ketu -> Rahu
+        if ketu_long < rahu_long:
+            in_sec2 = ketu_long <= p_long <= rahu_long
+        else:
+            in_sec2 = p_long >= ketu_long or p_long <= rahu_long
+
+        if not in_sec1:
+            all_in_sec1 = False
+        if not in_sec2:
+            all_in_sec2 = False
+
+    if all_in_sec1 or all_in_sec2:
         return [{
             "name": "Kaal Sarpa Yoga",
             "type": "special",

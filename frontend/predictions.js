@@ -141,7 +141,11 @@ function collectPerson() {
   const place = sp && sp.label === placeText
     ? { label: sp.label, lat: sp.lat, lon: sp.lon, timezone: sp.timezone }
     : { query: placeText };
-  return { name: name || null, dob, time, time_accuracy: "exact", place };
+
+  const yearLengthElement = document.getElementById("dasha-year-length");
+  const year_length = yearLengthElement ? parseFloat(yearLengthElement.value) : null;
+
+  return { name: name || null, dob, time, time_accuracy: "exact", place, year_length };
 }
 
 // ===== PROMPT BUILDERS =====
