@@ -9,6 +9,7 @@ from backend.services.ephemeris import (
     NAKSHATRA_YONI,
     NATURAL_RELATIONSHIPS,
     PLANET_LABELS,
+    SIGN_LORDS,
     SIGNS,
     degree_in_sign,
     relationship_between,
@@ -197,28 +198,100 @@ def gana_score(boy: ChartBundle, girl: ChartBundle) -> dict[str, Any]:
 
 
 def bhakoot_score(boy: ChartBundle, girl: ChartBundle) -> dict[str, Any]:
-    compatible = bhakoot_compatible(boy, girl)
-    score = 7.0 if compatible else 0.0
-    return {
+    bad_distances = {2, 5, 6, 8, 9, 12}
+    dist = bhakoot_distance(boy, girl)
+
+    if dist not in bad_distances:
+        score = 7.0
+        cancellation = None
+    else:
+        cancellation = _bhakoot_cancellation(boy, girl)
+        score = 7.0 if cancellation else 0.0
+
+    result: dict[str, Any] = {
         "boy": boy.data["core_identity"]["moon_sign"],
         "girl": girl.data["core_identity"]["moon_sign"],
         "max": 7,
         "obtained": score,
         "area": "Love",
     }
+    if cancellation:
+        result["cancellation"] = cancellation
+    return result
+
+
+def _bhakoot_cancellation(boy: ChartBundle, girl: ChartBundle) -> str | None:
+    """Check classical Bhakoot dosha cancellation conditions.
+
+    Returns a human-readable reason if cancelled, else None.
+    """
+    boy_moon_sign = boy.data["core_identity"]["moon_sign"]
+    girl_moon_sign = girl.data["core_identity"]["moon_sign"]
+    boy_lord = SIGN_LORDS[boy_moon_sign]
+    girl_lord = SIGN_LORDS[girl_moon_sign]
+
+    # Rule 1: Same Rashi Lord (e.g., Aries & Scorpio both ruled by Mars)
+    if boy_lord == girl_lord:
+        return f"Same rashi lord ({boy_lord})"
+
+    # Rule 2: Rashi lords are mutual natural friends
+    boy_rel = relationship_between(boy_lord, girl_lord)
+    girl_rel = relationship_between(girl_lord, boy_lord)
+    if boy_rel == "friend" and girl_rel == "friend":
+        return f"Rashi lords are mutual friends ({boy_lord} & {girl_lord})"
+
+    return None
 
 
 def nadi_score(boy: ChartBundle, girl: ChartBundle) -> dict[str, Any]:
     boy_nadi = get_nadi_type(boy)
     girl_nadi = get_nadi_type(girl)
-    score = 8.0 if boy_nadi != girl_nadi else 0.0
-    return {
+
+    if boy_nadi != girl_nadi:
+        score = 8.0
+        cancellation = None
+    else:
+        # Same nadi — check classical cancellation rules
+        cancellation = _nadi_cancellation(boy, girl)
+        score = 8.0 if cancellation else 0.0
+
+    result: dict[str, Any] = {
         "boy": boy_nadi,
         "girl": girl_nadi,
         "max": 8,
         "obtained": score,
         "area": "Health",
     }
+    if cancellation:
+        result["cancellation"] = cancellation
+    return result
+
+
+def _nadi_cancellation(boy: ChartBundle, girl: ChartBundle) -> str | None:
+    """Check classical Nadi dosha cancellation conditions.
+
+    Returns a human-readable reason if cancelled, else None.
+    """
+    boy_nak = boy.data["core_identity"]["nakshatra"]
+    girl_nak = girl.data["core_identity"]["nakshatra"]
+    boy_moon_sign = boy.data["core_identity"]["moon_sign"]
+    girl_moon_sign = girl.data["core_identity"]["moon_sign"]
+    boy_pada = boy.data["core_identity"]["nakshatra_pada"]
+    girl_pada = girl.data["core_identity"]["nakshatra_pada"]
+
+    # Rule 1: Same Rashi, different Nakshatra
+    if boy_moon_sign == girl_moon_sign and boy_nak != girl_nak:
+        return f"Same rashi ({boy_moon_sign}) but different nakshatras"
+
+    # Rule 2: Same Nakshatra, different Rashi
+    if boy_nak == girl_nak and boy_moon_sign != girl_moon_sign:
+        return f"Same nakshatra ({boy_nak}) but different rashis"
+
+    # Rule 3: Same Nakshatra, different Pada
+    if boy_nak == girl_nak and boy_pada != girl_pada:
+        return f"Same nakshatra ({boy_nak}) but different padas ({boy_pada} vs {girl_pada})"
+
+    return None
 
 
 def get_nadi_type(bundle: ChartBundle) -> str:
@@ -259,7 +332,10 @@ def bhakoot_distance(bundle: ChartBundle, partner: ChartBundle) -> int:
 
 def bhakoot_compatible(boy: ChartBundle, girl: ChartBundle) -> bool:
     bad_distances = {2, 5, 6, 8, 9, 12}
-    return bhakoot_distance(boy, girl) not in bad_distances
+    dist = bhakoot_distance(boy, girl)
+    if dist not in bad_distances:
+        return True
+    return _bhakoot_cancellation(boy, girl) is not None
 
 
 def tara_is_favorable(start_index: int, end_index: int) -> bool:

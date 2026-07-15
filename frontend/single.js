@@ -170,7 +170,8 @@ function renderPersonResult(chart) {
       <tr>
         <td>${formatLabel(planet)}</td>
         <td>${escapeHtml(d.sign)}</td>
-        <td>${d.house}</td>
+        <td>H${d.house}</td>
+        <td>H${d.bhava_house || d.house}</td>
         <td>${d.degree}</td>
         <td>${escapeHtml(d.nakshatra)}</td>
         <td>${d.pada}</td>
@@ -181,7 +182,7 @@ function renderPersonResult(chart) {
   const housesRows = Object.entries(chart.houses)
     .map(([house, d]) => `
       <tr>
-        <td>${house}</td>
+        <td>House ${house}</td>
         <td>${escapeHtml(d.sign)}</td>
         <td>${escapeHtml(d.lord)}</td>
         <td>${escapeHtml((d.occupants || []).join(", ") || "None")}</td>
@@ -218,7 +219,7 @@ function renderPersonResult(chart) {
           <h3>Planets</h3>
           <div class="table-wrapper">
             <table>
-              <thead><tr><th>Planet</th><th>Sign</th><th>House</th><th>Degree</th><th>Nakshatra</th><th>Pada</th></tr></thead>
+              <thead><tr><th>Planet</th><th>Sign</th><th>House (Whole)</th><th>House (Chalit)</th><th>Degree</th><th>Nakshatra</th><th>Pada</th></tr></thead>
               <tbody>${planetsRows}</tbody>
             </table>
           </div>
@@ -256,6 +257,16 @@ function renderPersonResult(chart) {
         </div>
 
         <div class="dosha-grid">
+          <h3>Planetary Yogas</h3>
+          ${renderYogas(chart.yogas)}
+        </div>
+
+        <div class="dosha-grid">
+          <h3>Ashtakvarga Strength</h3>
+          ${renderAshtakvarga(chart.ashtakvarga)}
+        </div>
+
+        <div class="dosha-grid">
           <h3>Aspects (Drishti)</h3>
           ${renderAspects(chart.aspects)}
         </div>
@@ -271,11 +282,12 @@ function renderPersonResult(chart) {
         </div>
 
         <div class="dosha-grid">
-          <h3>Dasha</h3>
+          <h3>Dasha &amp; Windows</h3>
           <div class="dosha-card">
-            <strong>Current:</strong>
-            ${chart.dasha.current.mahadasha} / ${chart.dasha.current.antardasha}
-            (${chart.dasha.current.start} to ${chart.dasha.current.end})
+            <strong>Current Dasha:</strong><br>
+            ${chart.dasha.current.mahadasha} / ${chart.dasha.current.antardasha} / ${chart.dasha.current.pratyantardasha || "N/A"}<br>
+            <small class="muted">MD/AD: ${chart.dasha.current.start} to ${chart.dasha.current.end}</small><br>
+            <small class="muted">PD: ${chart.dasha.current.pd_start || "N/A"} to ${chart.dasha.current.pd_end || "N/A"}</small>
           </div>
           <div class="dosha-card">
             <strong>Marriage Window:</strong> ${chart.derived_windows.marriage_window.join(" - ")}
@@ -286,6 +298,48 @@ function renderPersonResult(chart) {
         </div>
       </div>
     </article>
+  `;
+}
+
+function renderYogas(yogas) {
+  if (!yogas || !yogas.length) {
+    return `<div class="dosha-card">No major planetary combinations (yogas) detected.</div>`;
+  }
+  return yogas
+    .map(
+      (y) => `
+      <div class="dosha-card">
+        <strong>${escapeHtml(y.name)}</strong>
+        <span class="pill" style="font-size:0.7rem; margin-left:6px; background: ${y.strength === "strong" ? "rgba(85,122,70,0.15)" : "rgba(187,108,47,0.15)"}; border-color: ${y.strength === "strong" ? "var(--success)" : "var(--warning)"}; color: ${y.strength === "strong" ? "var(--success)" : "var(--warning)"};">
+          ${escapeHtml(y.strength)}
+        </span><br>
+        <small class="muted">${escapeHtml(y.description)}</small><br>
+        <small class="muted">Planets: ${escapeHtml((y.planets || []).join(", "))}</small>
+      </div>
+    `
+    )
+    .join("");
+}
+
+function renderAshtakvarga(ashtakvarga) {
+  if (!ashtakvarga) return "";
+  const signsHtml = Object.entries(ashtakvarga.sav_signs)
+    .map(
+      ([sign, bindus]) => `
+      <div style="background: rgba(141,79,45,0.04); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; text-align: center; font-size: 0.85rem;">
+        <strong>${escapeHtml(sign)}</strong><br>
+        <span style="font-weight: 700; color: ${bindus >= 28 ? "var(--success)" : "var(--text)"};">${bindus}</span>
+      </div>
+    `
+    )
+    .join("");
+  return `
+    <div class="dosha-card" style="grid-column: 1 / -1;">
+      <strong>Sarvashtakvarga (SAV) points:</strong> Grand Total: ${ashtakvarga.grand_total} (optimal average = 28 per sign)<br>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; margin-top: 10px;">
+        ${signsHtml}
+      </div>
+    </div>
   `;
 }
 
@@ -339,14 +393,18 @@ function renderNavamsa(navamsa) {
 
 function renderTransits(transits) {
   return Object.entries(transits)
-    .map(([planet, d]) => `
-      <div class="dosha-card">
-        <strong>${formatLabel(planet)}:</strong>
-        ${escapeHtml(d.sign)} ${d.degree}° (H${d.transit_house})
-        ${d.retro ? '<span class="pill" style="font-size:0.7rem">R</span>' : ""}<br>
-        <small class="muted">${escapeHtml(d.nakshatra)} Pada ${d.pada}</small>
-      </div>
-    `)
+    .map(([planet, d]) => {
+      const qualityHtml = d.bav_bindus !== undefined ? `<br><small class="muted">SAV Bindus: <strong>${d.bav_bindus}</strong> (${escapeHtml(d.transit_quality)})</small>` : "";
+      return `
+        <div class="dosha-card">
+          <strong>${formatLabel(planet)}:</strong>
+          ${escapeHtml(d.sign)} ${d.degree}° (H${d.transit_house})
+          ${d.retro ? '<span class="pill" style="font-size:0.7rem">R</span>' : ""}<br>
+          <small class="muted">${escapeHtml(d.nakshatra)} Pada ${d.pada}</small>
+          ${qualityHtml}
+        </div>
+      `;
+    })
     .join("");
 }
 

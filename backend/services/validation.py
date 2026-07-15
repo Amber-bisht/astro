@@ -13,7 +13,12 @@ REQUIRED_HOUSE_SCORES = {"wealth_2nd", "marriage_7th", "career_10th", "gains_11t
 
 
 def validate_full_chart_object(chart: dict[str, Any]) -> None:
-    _require_keys(chart, {"meta", "core_identity", "planets", "houses", "lords_mapping", "planet_strength", "doshas", "house_scores", "dasha", "derived_windows", "aspects", "navamsa", "transits"})
+    _require_keys(chart, {
+        "meta", "core_identity", "planets", "houses", "lords_mapping",
+        "planet_strength", "doshas", "house_scores", "dasha",
+        "derived_windows", "aspects", "navamsa", "transits",
+        "yogas", "ashtakvarga",
+    })
 
     _require_non_empty(chart["meta"], {"ayanamsa", "house_system", "lat", "lon", "timezone", "time_accuracy"})
     _require_non_empty(chart["core_identity"], {"lagna", "moon_sign", "sun_sign", "nakshatra", "nakshatra_pada", "tithi", "yoga", "karana"})
@@ -54,7 +59,7 @@ def validate_full_chart_object(chart: dict[str, Any]) -> None:
 
     dasha = chart["dasha"]
     _require_keys(dasha, {"current", "timeline"})
-    _require_non_empty(dasha["current"], {"mahadasha", "antardasha", "start", "end"})
+    _require_non_empty(dasha["current"], {"mahadasha", "antardasha", "pratyantardasha", "start", "end", "pd_start", "pd_end"})
     if not dasha["timeline"]:
         raise IncompleteChartDataError("Dasha missing")
 
@@ -84,9 +89,18 @@ def validate_full_chart_object(chart: dict[str, Any]) -> None:
 
     # --- Transit snapshot ---
     transits = chart["transits"]
-    _require_non_empty(transits, {"jupiter", "saturn"})
-    for t_key in ("jupiter", "saturn"):
+    _require_non_empty(transits, {"jupiter", "saturn", "mars", "rahu", "ketu"})
+    for t_key in ("jupiter", "saturn", "mars", "rahu", "ketu"):
         _require_non_empty(transits[t_key], {"sign", "degree", "nakshatra", "pada", "transit_house"})
+
+    # --- Yogas ---
+    yogas = chart["yogas"]
+    if not isinstance(yogas, list):
+        raise IncompleteChartDataError("yogas must be a list")
+
+    # --- Ashtakvarga ---
+    ashtakvarga = chart["ashtakvarga"]
+    _require_keys(ashtakvarga, {"bav", "sav", "grand_total"})
 
 
 def _require_keys(payload: dict[str, Any], keys: set[str]) -> None:

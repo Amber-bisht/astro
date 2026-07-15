@@ -299,6 +299,33 @@ NATURAL_RELATIONSHIPS = {
 BENEFIC_PLANETS = {"Moon", "Mercury", "Jupiter", "Venus"}
 MALEFIC_PLANETS = {"Sun", "Mars", "Saturn", "Rahu", "Ketu"}
 
+# Panchadha Maitri — compound relationship from Natural + Temporary
+# Temporary relationship: planets in houses 2,3,4,10,11,12 from a planet
+# are temporary friends; planets in 1,5,6,7,8,9 are temporary enemies.
+TEMP_FRIEND_OFFSETS = {2, 3, 4, 10, 11, 12}  # house offsets
+
+# 5-fold compound mapping: (natural, temporary) → compound
+COMPOUND_RELATIONSHIP = {
+    ("friend", "friend"): "adhi_mitra",
+    ("friend", "enemy"): "sama",
+    ("neutral", "friend"): "mitra",
+    ("neutral", "enemy"): "shatru",
+    ("enemy", "friend"): "sama",
+    ("enemy", "enemy"): "adhi_shatru",
+}
+
+# Strength weight mapping for compound relationships (used in house scoring)
+COMPOUND_STRENGTH_WEIGHTS = {
+    "exalted": 2.0,
+    "own": 1.5,
+    "adhi_mitra": 1.0,
+    "mitra": 0.5,
+    "sama": 0.0,
+    "shatru": -0.5,
+    "adhi_shatru": -1.0,
+    "debilitated": -1.5,
+}
+
 SIDEREAL_FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_SIDEREAL
 NAKSHATRA_SPAN = 360 / 27
 
@@ -400,8 +427,23 @@ def build_chart_bundle(resolved_birth: ResolvedBirthData) -> ChartBundle:
         house_payload[str(house_number)] = {"sign": sign_name, "lord": lord_name, "occupants": occupants}
         lords_mapping[str(house_number)] = lord_name
 
+    # --- Bhava Chalit (cusp-based house overlay) ---
+    # cusps[0..11] are the 12 cusp longitudes from swe.houses_ex
+    bhava_chalit: dict[str, int] = {}
+    for planet_key in PLANET_ORDER:
+        p_long = planet_longitudes[planet_key]
+        bhava_house = _bhava_chalit_house(p_long, cusps)
+        bhava_chalit[planet_key] = bhava_house
+        # Add bhava_house to planet payload
+        planet_payload[planet_key]["bhava_house"] = bhava_house
+
     planet_strengths = {
-        planet: classify_planet_strength(PLANET_LABELS[planet], planet_payload[planet]["sign"])
+        planet: classify_planet_strength_compound(
+            PLANET_LABELS[planet],
+            planet_payload[planet]["sign"],
+            planet_houses[planet],
+            planet_houses,
+        )
         for planet in PLANET_ORDER
     }
 
@@ -489,6 +531,30 @@ def whole_sign_house(planet_sign_index: int, lagna_sign_index: int) -> int:
     return ((planet_sign_index - lagna_sign_index) % 12) + 1
 
 
+def _bhava_chalit_house(planet_longitude: float, cusps: tuple) -> int:
+    """Determine which Bhava Chalit house a planet falls into.
+
+    Args:
+        planet_longitude: Sidereal longitude of the planet.
+        cusps: 12-element tuple of cusp longitudes from swe.houses_ex.
+
+    Returns:
+        House number 1-12 based on cusp boundaries.
+    """
+    p_long = normalize_longitude(planet_longitude)
+    for i in range(12):
+        cusp_start = normalize_longitude(cusps[i])
+        cusp_end = normalize_longitude(cusps[(i + 1) % 12])
+        if cusp_start < cusp_end:
+            if cusp_start <= p_long < cusp_end:
+                return i + 1
+        else:
+            # Wraps around 360°
+            if p_long >= cusp_start or p_long < cusp_end:
+                return i + 1
+    return 1  # Fallback
+
+
 def get_nakshatra(longitude: float) -> tuple[str, int, int]:
     normalized = normalize_longitude(longitude)
     index = int(normalized / NAKSHATRA_SPAN)
@@ -498,6 +564,7 @@ def get_nakshatra(longitude: float) -> tuple[str, int, int]:
 
 
 def classify_planet_strength(planet_label: str, sign_name: str) -> str:
+    """Simple 6-level dignity classification (backward-compatible)."""
     if EXALTATION_SIGNS.get(planet_label) == sign_name:
         return "exalted"
     if DEBILITATION_SIGNS.get(planet_label) == sign_name:
@@ -512,6 +579,76 @@ def classify_planet_strength(planet_label: str, sign_name: str) -> str:
     if sign_lord in relationship["enemies"]:
         return "enemy"
     return "neutral"
+
+
+def _natural_relationship(planet_label: str, other_label: str) -> str:
+    """Return the natural relationship: 'friend', 'neutral', or 'enemy'."""
+    if planet_label == other_label:
+        return "friend"  # same planet treated as friend
+    rels = NATURAL_RELATIONSHIPS.get(planet_label)
+    if rels is None:
+        return "neutral"
+    if other_label in rels["friends"]:
+        return "friend"
+    if other_label in rels["enemies"]:
+        return "enemy"
+    return "neutral"
+
+
+def _temporary_relationship(
+    planet_house: int,
+    other_house: int,
+) -> str:
+    """Temporary relationship based on house distance.
+
+    Planets in houses 2,3,4,10,11,12 from the planet are temporary friends.
+    Planets in houses 1,5,6,7,8,9 are temporary enemies.
+    """
+    distance = ((other_house - planet_house) % 12) + 1
+    return "friend" if distance in TEMP_FRIEND_OFFSETS else "enemy"
+
+
+def compound_relationship(
+    planet_label: str,
+    sign_lord_label: str,
+    planet_house: int,
+    all_planet_houses: dict[str, int],
+) -> str:
+    """Panchadha Maitri: combine natural + temporary relationship.
+
+    Returns one of: adhi_mitra, mitra, sama, shatru, adhi_shatru.
+    """
+    natural = _natural_relationship(planet_label, sign_lord_label)
+    # Find the sign lord's house.  The sign lord key needs mapping.
+    lord_key = DISPLAY_TO_KEY.get(sign_lord_label)
+    if lord_key is None or lord_key not in all_planet_houses:
+        # Fallback: if lord not tracked, use natural only
+        return {"friend": "mitra", "enemy": "shatru", "neutral": "sama"}[natural]
+    lord_house = all_planet_houses[lord_key]
+    temporary = _temporary_relationship(planet_house, lord_house)
+    return COMPOUND_RELATIONSHIP[(natural, temporary)]
+
+
+def classify_planet_strength_compound(
+    planet_label: str,
+    sign_name: str,
+    planet_house: int,
+    all_planet_houses: dict[str, int],
+) -> str:
+    """Full Panchadha Maitri strength classification.
+
+    Returns: exalted, own, adhi_mitra, mitra, sama, shatru, adhi_shatru,
+    or debilitated.
+    """
+    if EXALTATION_SIGNS.get(planet_label) == sign_name:
+        return "exalted"
+    if DEBILITATION_SIGNS.get(planet_label) == sign_name:
+        return "debilitated"
+    if sign_name in OWN_SIGNS.get(planet_label, set()):
+        return "own"
+
+    sign_lord = SIGN_LORDS[sign_name]
+    return compound_relationship(planet_label, sign_lord, planet_house, all_planet_houses)
 
 
 def relationship_between(planeta: str, planetb: str) -> str:
@@ -546,7 +683,7 @@ def get_karana_name(sun_longitude: float, moon_longitude: float) -> str:
 
 
 def compute_transit_snapshot(lagna_sign_index: int) -> dict[str, dict[str, Any]]:
-    """Current sidereal positions of Jupiter and Saturn.
+    """Current sidereal positions of major transiting planets.
 
     Args:
         lagna_sign_index: The natal lagna sign index so we can report
@@ -554,17 +691,7 @@ def compute_transit_snapshot(lagna_sign_index: int) -> dict[str, dict[str, Any]]
             relative to the native's ascendant.
 
     Returns:
-        {
-            "jupiter": {
-                "sign": "Taurus",
-                "degree": 12.3456,
-                "nakshatra": "Rohini",
-                "pada": 2,
-                "retro": false,
-                "transit_house": 3
-            },
-            "saturn": { ... }
-        }
+        Dict with keys: jupiter, saturn, mars, rahu, ketu
     """
     from datetime import datetime, timezone as _tz
 
@@ -577,7 +704,12 @@ def compute_transit_snapshot(lagna_sign_index: int) -> dict[str, dict[str, Any]]
         swe.GREG_CAL,
     )
 
-    transit_planets = {"jupiter": swe.JUPITER, "saturn": swe.SATURN}
+    transit_planets = {
+        "jupiter": swe.JUPITER,
+        "saturn": swe.SATURN,
+        "mars": swe.MARS,
+        "rahu": swe.TRUE_NODE,
+    }
     snapshot: dict[str, dict[str, Any]] = {}
 
     for key, swiss_id in transit_planets.items():
@@ -596,6 +728,22 @@ def compute_transit_snapshot(lagna_sign_index: int) -> dict[str, dict[str, Any]]
             "retro": speed < 0,
             "transit_house": house,
         }
+
+    # Ketu is always 180° from Rahu
+    rahu_data = snapshot["rahu"]
+    rahu_long_approx = SIGNS.index(rahu_data["sign"]) * 30 + rahu_data["degree"]
+    ketu_long = normalize_longitude(rahu_long_approx + 180)
+    ketu_sign_idx = sign_index_from_longitude(ketu_long)
+    ketu_nak, _, ketu_pada = get_nakshatra(ketu_long)
+    ketu_house = whole_sign_house(ketu_sign_idx, lagna_sign_index)
+    snapshot["ketu"] = {
+        "sign": SIGNS[ketu_sign_idx],
+        "degree": round(degree_in_sign(ketu_long), 4),
+        "nakshatra": ketu_nak,
+        "pada": ketu_pada,
+        "retro": rahu_data["retro"],
+        "transit_house": ketu_house,
+    }
 
     return snapshot
 

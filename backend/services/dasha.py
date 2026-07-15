@@ -37,10 +37,20 @@ class AntardashaPeriod:
 
 
 @dataclass(frozen=True)
+class PratyantardashaPeriod:
+    mahadasha: str
+    antardasha: str
+    pratyantardasha: str
+    start: datetime
+    end: datetime
+
+
+@dataclass(frozen=True)
 class DashaBundle:
     public: dict
     major_periods: list[DashaPeriod]
     antardasha_periods: list[AntardashaPeriod]
+    pratyantardasha_periods: list[PratyantardashaPeriod]
 
 
 def build_vimshottari_dasha(moon_longitude: float, birth_dt: datetime, reference_dt: datetime | None = None) -> DashaBundle:
@@ -81,15 +91,46 @@ def build_vimshottari_dasha(moon_longitude: float, birth_dt: datetime, reference
             )
             current_sub_start = current_sub_end
 
+    # --- Pratyantardasha (3rd level) ---
+    pratyantardasha_periods: list[PratyantardashaPeriod] = []
+    for ad in antardasha_periods:
+        ad_index = DASHA_ORDER.index(ad.antardasha)
+        pd_start = ad.start
+        for offset in range(len(DASHA_ORDER)):
+            pd_lord = DASHA_ORDER[(ad_index + offset) % len(DASHA_ORDER)]
+            # PD duration = (MD years × AD years × PD years / 120²) × year_days
+            pd_days = (
+                DASHA_YEARS[ad.mahadasha]
+                * DASHA_YEARS[ad.antardasha]
+                * DASHA_YEARS[pd_lord]
+                * DASHA_YEAR_DAYS
+                / 14400  # 120 * 120
+            )
+            pd_end = pd_start + timedelta(days=pd_days)
+            pratyantardasha_periods.append(
+                PratyantardashaPeriod(
+                    mahadasha=ad.mahadasha,
+                    antardasha=ad.antardasha,
+                    pratyantardasha=pd_lord,
+                    start=pd_start,
+                    end=pd_end,
+                )
+            )
+            pd_start = pd_end
+
     current_major = _find_current_major(major_periods, reference_dt)
     current_antardasha = _find_current_antardasha(antardasha_periods, reference_dt)
+    current_pratyantardasha = _find_current_pratyantardasha(pratyantardasha_periods, reference_dt)
 
     public = {
         "current": {
             "mahadasha": current_major.planet,
             "antardasha": current_antardasha.antardasha,
+            "pratyantardasha": current_pratyantardasha.pratyantardasha,
             "start": current_antardasha.start.date().isoformat(),
             "end": current_antardasha.end.date().isoformat(),
+            "pd_start": current_pratyantardasha.start.date().isoformat(),
+            "pd_end": current_pratyantardasha.end.date().isoformat(),
         },
         "timeline": [
             {
@@ -102,7 +143,12 @@ def build_vimshottari_dasha(moon_longitude: float, birth_dt: datetime, reference
         ],
     }
 
-    return DashaBundle(public=public, major_periods=major_periods, antardasha_periods=antardasha_periods)
+    return DashaBundle(
+        public=public,
+        major_periods=major_periods,
+        antardasha_periods=antardasha_periods,
+        pratyantardasha_periods=pratyantardasha_periods,
+    )
 
 
 def _find_current_major(periods: list[DashaPeriod], moment: datetime) -> DashaPeriod:
@@ -113,6 +159,15 @@ def _find_current_major(periods: list[DashaPeriod], moment: datetime) -> DashaPe
 
 
 def _find_current_antardasha(periods: list[AntardashaPeriod], moment: datetime) -> AntardashaPeriod:
+    for period in periods:
+        if period.start <= moment < period.end:
+            return period
+    return periods[-1]
+
+
+def _find_current_pratyantardasha(
+    periods: list[PratyantardashaPeriod], moment: datetime
+) -> PratyantardashaPeriod:
     for period in periods:
         if period.start <= moment < period.end:
             return period

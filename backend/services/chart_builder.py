@@ -4,31 +4,29 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from backend.services.aspects import compute_aspects
+from backend.services.ashtakvarga import compute_ashtakvarga, get_transit_bindu
 from backend.services.dasha import DashaBundle, build_vimshottari_dasha
 from backend.services.ephemeris import (
     BENEFIC_PLANETS,
     ChartBundle,
+    COMPOUND_STRENGTH_WEIGHTS,
     DISPLAY_TO_KEY,
     MALEFIC_PLANETS,
     PLANET_LABELS,
     PLANET_ORDER,
+    SIGNS,
     build_chart_bundle,
     compute_transit_snapshot,
+    sign_index_from_longitude,
 )
 from backend.services.geocoding import ResolvedBirthData
 from backend.services.guna_milan import bhakoot_compatible, bhakoot_distance, get_nadi_type
 from backend.services.navamsa import compute_navamsa
 from backend.services.validation import validate_full_chart_object
+from backend.services.yogas import detect_yogas
 
 
-STRENGTH_WEIGHTS = {
-    "exalted": 2.0,
-    "own": 1.5,
-    "friendly": 0.75,
-    "neutral": 0.0,
-    "enemy": -0.75,
-    "debilitated": -1.5,
-}
+STRENGTH_WEIGHTS = COMPOUND_STRENGTH_WEIGHTS
 
 
 def build_pair_charts(boy_birth: ResolvedBirthData, girl_birth: ResolvedBirthData) -> dict[str, dict[str, Any]]:
@@ -69,6 +67,26 @@ def _enrich_chart(bundle: ChartBundle) -> None:
     }
     bundle.data["navamsa"] = compute_navamsa(bundle)
     bundle.data["transits"] = compute_transit_snapshot(bundle.lagna_sign_index)
+    bundle.data["yogas"] = detect_yogas(bundle)
+
+    # Ashtakvarga — BAV + SAV tables
+    ashtakvarga = compute_ashtakvarga(bundle)
+    bundle.data["ashtakvarga"] = ashtakvarga
+
+    # Enrich transit data with BAV bindus for transit assessment
+    for t_key in ("jupiter", "saturn"):
+        transit_info = bundle.data["transits"].get(t_key, {})
+        t_sign = transit_info.get("sign")
+        if t_sign and t_sign in SIGNS:
+            t_sign_idx = SIGNS.index(t_sign)
+            bindu = get_transit_bindu(ashtakvarga, t_key, t_sign_idx)
+            transit_info["bav_bindus"] = bindu
+            if bindu is not None:
+                transit_info["transit_quality"] = (
+                    "favorable" if bindu >= 5
+                    else "neutral" if bindu == 4
+                    else "challenging"
+                )
 
 
 def _apply_pairwise_doshas(boy: ChartBundle, girl: ChartBundle) -> None:
@@ -142,15 +160,18 @@ def score_house(bundle: ChartBundle, house_number: int) -> dict[str, Any]:
 
 def compute_manglik(bundle: ChartBundle, partner: ChartBundle | None) -> dict[str, Any]:
     mars_house = bundle.planet_houses["mars"]
-    present = mars_house in {1, 4, 7, 8, 12}
+    # Include 2nd house per South Indian tradition
+    present = mars_house in {1, 2, 4, 7, 8, 12}
     strength = bundle.data["planet_strength"]["mars"]
     cancellation = present and strength in {"exalted", "own"}
     if partner is not None:
-        cancellation = cancellation or (present and partner.planet_houses["mars"] in {1, 4, 7, 8, 12})
+        cancellation = cancellation or (present and partner.planet_houses["mars"] in {1, 2, 4, 7, 8, 12})
 
     severity = "low"
     if present:
         severity = "high" if mars_house in {7, 8} else "medium"
+        if mars_house == 2:
+            severity = "mild"  # 2nd house Manglik is less severe
         if strength in {"exalted", "own"} and severity == "high":
             severity = "medium"
         if cancellation:
