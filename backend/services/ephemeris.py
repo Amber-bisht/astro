@@ -480,6 +480,10 @@ def _build_chart_bundle_cached(resolved_birth: ResolvedBirthData) -> ChartBundle
             "retro": planet_payload["rahu"]["retro"],
             "speed": planet_payload["rahu"]["speed"],
         }
+        for p_key in planet_payload:
+            label = PLANET_LABELS.get(p_key, p_key.capitalize())
+            planet_payload[p_key]["is_benefic"] = is_planet_benefic(label, planet_longitudes)
+
 
     house_payload: dict[str, dict[str, Any]] = {}
     lords_mapping: dict[str, str] = {}
@@ -541,6 +545,7 @@ def _build_chart_bundle_cached(resolved_birth: ResolvedBirthData) -> ChartBundle
             "local_datetime": resolved_birth.local_datetime.isoformat(),
             "utc_datetime": resolved_birth.utc_datetime.isoformat(),
             "is_lmt": resolved_birth.is_lmt,
+            "year_length": resolved_birth.year_length,
             "warnings": warnings,
         },
         "core_identity": {

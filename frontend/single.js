@@ -533,7 +533,10 @@ Tithi: ${chart.core_identity.tithi}`;
 
 function extractPlanets(chart) {
   return Object.entries(chart.planets)
-    .map(([p, d]) => `${formatLabel(p)}: ${d.sign} H${d.house} ${d.degree.toFixed(1)}° ${d.nakshatra}${d.retro ? " [R]" : ""}`)
+    .map(([p, d]) => {
+      const type = d.is_benefic ? "Benefic" : "Malefic";
+      return `${formatLabel(p)} (${type}): ${d.sign} H${d.house} ${d.degree.toFixed(1)}° ${d.nakshatra}${d.retro ? " [R]" : ""}`;
+    })
     .join("\n");
 }
 
@@ -580,14 +583,18 @@ function extractAspectsReceived(aspects, houses) {
 
 function chartBlock(data) {
   const c = data.chart;
+  const yogasStr = (c.yogas || []).map(y => `- ${y.name} (${y.strength}): ${y.description}`).join("\n") || "None";
   return `--- BIRTH CHART ---
-Birth: ${c.meta.local_datetime} at ${c.meta.place_name}
+Birth: ${c.meta.local_datetime} at ${c.meta.place_name} (Ayanamsa: ${c.meta.ayanamsa}, Dasha Year Length: ${c.meta.year_length || '365.24 days'})
 ${extractCore(c)}
 
 All Planets:
 ${extractPlanets(c)}
 
 Planet Strength: ${JSON.stringify(c.planet_strength)}
+
+Yogas:
+${yogasStr}
 
 ${extractAspectsReceived(c.aspects, [1, 2, 5, 7, 8, 10, 11])}
 

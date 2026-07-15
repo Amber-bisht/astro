@@ -155,13 +155,17 @@ const SYS = `You are an expert Vedic astrologer with 30+ years of experience. Pa
 function chartData(data) {
   const c = data.chart;
   const planets = Object.entries(c.planets)
-    .map(([p, d]) => `${fmt(p)}: ${d.sign} H${d.house} ${d.degree.toFixed(1)}° ${d.nakshatra}${d.retro ? " [R]" : ""}`)
+    .map(([p, d]) => {
+      const type = d.is_benefic ? "Benefic" : "Malefic";
+      return `${fmt(p)} (${type}): ${d.sign} H${d.house} ${d.degree.toFixed(1)}° ${d.nakshatra}${d.retro ? " [R]" : ""}`;
+    })
     .join("\n");
   const transits = Object.entries(c.transits)
     .map(([p, d]) => `${fmt(p)}: ${d.sign} ${d.degree.toFixed(1)}° H${d.transit_house}${d.retro ? " [R]" : ""}`)
     .join("\n");
   const da = c.dasha.current;
-  return `Birth: ${c.meta.local_datetime} at ${c.meta.place_name}
+  const yogasStr = (c.yogas || []).map(y => `- ${y.name} (${y.strength}): ${y.description}`).join("\n") || "None";
+  return `Birth: ${c.meta.local_datetime} at ${c.meta.place_name} (Ayanamsa: ${c.meta.ayanamsa}, Dasha Year Length: ${c.meta.year_length || '365.24 days'})
 Lagna: ${c.core_identity.lagna} | Moon: ${c.core_identity.moon_sign} | Sun: ${c.core_identity.sun_sign}
 Nakshatra: ${c.core_identity.nakshatra} (Pada ${c.core_identity.nakshatra_pada})
 
@@ -169,6 +173,9 @@ Planets:
 ${planets}
 
 Planet Strength: ${JSON.stringify(c.planet_strength)}
+
+Yogas:
+${yogasStr}
 
 Current Dasha: ${da.mahadasha}/${da.antardasha} (${da.start} to ${da.end})
 
