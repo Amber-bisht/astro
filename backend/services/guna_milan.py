@@ -57,13 +57,16 @@ YONI_SCORE_MATRIX = {
     "Lion": {"Horse": 1, "Elephant": 0, "Sheep": 1, "Serpent": 2, "Dog": 1, "Cat": 2, "Rat": 2, "Cow": 1, "Buffalo": 1, "Tiger": 1, "Deer": 2, "Monkey": 2, "Mongoose": 2, "Lion": 4},
 }
 
-GANA_SCORES = {
-    frozenset({"Deva"}): 6.0,
-    frozenset({"Manushya"}): 6.0,
-    frozenset({"Rakshasa"}): 6.0,
-    frozenset({"Deva", "Manushya"}): 5.0,
-    frozenset({"Manushya", "Rakshasa"}): 1.0,
-    frozenset({"Deva", "Rakshasa"}): 0.0,
+GANA_MATRIX = {
+    ("Deva", "Deva"): 6.0,
+    ("Deva", "Manushya"): 5.0,
+    ("Deva", "Rakshasa"): 0.0,
+    ("Manushya", "Deva"): 5.0,
+    ("Manushya", "Manushya"): 6.0,
+    ("Manushya", "Rakshasa"): 1.0,
+    ("Rakshasa", "Deva"): 0.0,
+    ("Rakshasa", "Manushya"): 0.0,
+    ("Rakshasa", "Rakshasa"): 6.0,
 }
 
 
@@ -187,7 +190,7 @@ def maitri_score(boy: ChartBundle, girl: ChartBundle) -> dict[str, Any]:
 def gana_score(boy: ChartBundle, girl: ChartBundle) -> dict[str, Any]:
     boy_gana = get_gana_type(boy)
     girl_gana = get_gana_type(girl)
-    score = GANA_SCORES[frozenset({boy_gana, girl_gana})]
+    score = GANA_MATRIX[(boy_gana, girl_gana)]
     return {
         "boy": boy_gana,
         "girl": girl_gana,
