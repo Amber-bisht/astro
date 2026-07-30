@@ -495,5 +495,119 @@ class TestKundaliReliability(unittest.TestCase):
         self.assertEqual(bundle.data["core_identity"]["moon_sign"], "Taurus")
         self.assertFalse(bundle.resolved_birth.is_lmt)
 
+    def test_rule_book_interpretations(self):
+        """Verify that Seshadri Iyer, Phaladeepika livelihood, and Panchanga engines calculate correctly."""
+        resolved = ResolvedBirthData(
+            name="Mahatma Gandhi",
+            dob=date(1869, 10, 2),
+            birth_time=time(7, 12),
+            time_accuracy="exact",
+            place=ResolvedPlace("Porbandar", 21.6417, 69.6293, "Asia/Kolkata"),
+            local_datetime=datetime(1869, 10, 2, 7, 12),
+            utc_datetime=datetime(1869, 10, 2, 2, 33, 50, tzinfo=timezone.utc),
+            is_lmt=True
+        )
+        
+        from backend.services.chart_builder import build_single_chart
+        chart = build_single_chart(resolved)
+        
+        # Verify keys are present
+        self.assertIn("rule_book_interpretations", chart)
+        rb = chart["rule_book_interpretations"]
+        self.assertIn("seshadri_iyer_d9", rb)
+        self.assertIn("phaladeepika_livelihood", rb)
+        self.assertIn("birth_panchanga", rb)
+        
+        # Verify structures
+        livelihood = rb["phaladeepika_livelihood"]
+        self.assertIn("strongest_reference", livelihood)
+        self.assertIn("ultimate_livelihood_planet", livelihood)
+        self.assertIn("scriptural_translation", livelihood)
+        self.assertIn("debug_scores", livelihood)
+        
+        panchanga = rb["birth_panchanga"]
+        self.assertIn("tithi_ruling", panchanga)
+        self.assertIn("yoga_ruling", panchanga)
+        self.assertIn("karana_ruling", panchanga)
+        self.assertIn("nakshatra_ruling", panchanga)
+        
+        self.assertEqual(panchanga["karana_ruling"]["governing_deity"], "Lord Brahma") # Gandhi was born under Balava Karana
+
+    def test_heavy_duty_vedic_engines(self):
+        """Verify that Shadbala, Ashtakavarga Reductions, Shodashvarga, Vedhas, and Graph Yogas calculate correctly."""
+        resolved = ResolvedBirthData(
+            name="Mahatma Gandhi",
+            dob=date(1869, 10, 2),
+            birth_time=time(7, 12),
+            time_accuracy="exact",
+            place=ResolvedPlace("Porbandar", 21.6417, 69.6293, "Asia/Kolkata"),
+            local_datetime=datetime(1869, 10, 2, 7, 12),
+            utc_datetime=datetime(1869, 10, 2, 2, 33, 50, tzinfo=timezone.utc),
+            is_lmt=True
+        )
+        
+        from backend.services.chart_builder import build_single_chart
+        chart = build_single_chart(resolved)
+        
+        # 1. Verify Ashtakavarga Reductions
+        self.assertIn("bav_reductions", chart["ashtakvarga"])
+        reductions = chart["ashtakvarga"]["bav_reductions"]
+        self.assertIn("sun", reductions)
+        self.assertIn("trikona_reduced", reductions["sun"])
+        self.assertIn("ekadhipatya_reduced", reductions["sun"])
+        self.assertIn("sodhyapinda", reductions["sun"])
+        
+        # 2. Verify Shadbala
+        self.assertIn("shadbala", chart)
+        self.assertIn("sun", chart["shadbala"])
+        self.assertIn("sthana_bala", chart["shadbala"]["sun"])
+        self.assertIn("dig_bala", chart["shadbala"]["sun"])
+        self.assertIn("total_shashtiamsa", chart["shadbala"]["sun"])
+        
+        # 3. Verify Shodashvarga
+        self.assertIn("shodashvarga", chart)
+        self.assertIn("charts", chart["shodashvarga"])
+        self.assertIn("vaiseshikamsa", chart["shodashvarga"])
+        self.assertIn("D1", chart["shodashvarga"]["charts"])
+        self.assertIn("D60", chart["shodashvarga"]["charts"])
+        self.assertIn("sun", chart["shodashvarga"]["vaiseshikamsa"])
+        
+        # 4. Verify Vedhas
+        self.assertIn("vedhas", chart)
+        self.assertIn("saptashalaka", chart["vedhas"])
+        self.assertIn("sarvatobhadra", chart["vedhas"])
+        
+        # 5. Verify Graph Yogas
+        self.assertIn("graph_yogas", chart)
+
+    def test_evidence_engine_and_chandra_states(self):
+        """Verify that Chandra Kriyas, Avasthas, Velas, and VedicEvidenceEngine compile successfully."""
+        resolved = ResolvedBirthData(
+            name="Mahatma Gandhi",
+            dob=date(1869, 10, 2),
+            birth_time=time(7, 12),
+            time_accuracy="exact",
+            place=ResolvedPlace("Porbandar", 21.6417, 69.6293, "Asia/Kolkata"),
+            local_datetime=datetime(1869, 10, 2, 7, 12),
+            utc_datetime=datetime(1869, 10, 2, 2, 33, 50, tzinfo=timezone.utc),
+            is_lmt=True
+        )
+        
+        from backend.services.chart_builder import build_single_chart
+        chart = build_single_chart(resolved)
+        
+        # Verify Chandra states
+        self.assertIn("chandra_states", chart)
+        cs = chart["chandra_states"]
+        self.assertIn("kriya", cs)
+        self.assertIn("avastha", cs)
+        self.assertIn("vela", cs)
+        
+        # Verify Evidence Engine
+        self.assertIn("evidence_chains", chart)
+        self.assertIn("career", chart["evidence_chains"])
+        self.assertIn("personality", chart["evidence_chains"])
+        self.assertIn("confidence", chart["evidence_chains"]["career"])
+
 if __name__ == '__main__':
     unittest.main()

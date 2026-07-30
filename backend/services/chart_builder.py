@@ -54,9 +54,45 @@ def build_single_chart(birth: ResolvedBirthData) -> dict[str, Any]:
 
 
 def _enrich_chart(bundle: ChartBundle) -> None:
-    # Aspects must be computed first — house_scores uses them.
+    # 1. Base calculations first (aspects, navamsa, transits, yogas, ashtakvarga)
     bundle.data["aspects"] = compute_aspects(bundle)
-    bundle.data["house_scores"] = compute_house_scores(bundle)
+    bundle.data["navamsa"] = compute_navamsa(bundle)
+    bundle.data["transits"] = compute_transit_snapshot(bundle.lagna_sign_index)
+    bundle.data["yogas"] = detect_yogas(bundle)
+
+    ashtakvarga = compute_ashtakvarga(bundle)
+    bundle.data["ashtakvarga"] = ashtakvarga
+
+    # 2. Heavy-duty Vedic engine computations (Shadbala, Shodashvarga, Graph Yogas, Chandra States, Vedhas)
+    from backend.services.shadbala import compute_shadbala
+    from backend.services.shodashvarga import compute_shodashvarga
+    from backend.services.yoga_compiler import compile_and_detect_yogas
+    from backend.services.vedha_engine import check_saptashalaka_vedha, check_sarvatobhadra_vedha
+    from backend.services.chandra_states import compute_chandra_states
+    from backend.services.evidence_engine import VedicEvidenceEngine
+
+    bundle.data["shadbala"] = compute_shadbala(bundle)
+    bundle.data["shodashvarga"] = compute_shodashvarga(bundle)
+    bundle.data["graph_yogas"] = compile_and_detect_yogas(bundle)
+    bundle.data["chandra_states"] = compute_chandra_states(bundle.moon_longitude)
+    
+    natal_nak = bundle.data["core_identity"]["nakshatra"]
+    bundle.data["vedhas"] = {
+        "saptashalaka": check_saptashalaka_vedha(natal_nak, bundle.data["transits"]),
+        "sarvatobhadra": check_sarvatobhadra_vedha(natal_nak, bundle.data["transits"])
+    }
+
+    # 3. Deterministic Evidence Synthesis & Advanced House Scoring
+    engine = VedicEvidenceEngine(bundle.data)
+    bundle.data["house_scores"] = {
+        "wealth_2nd": engine.score_house_advanced(2),
+        "marriage_7th": engine.score_house_advanced(7),
+        "career_10th": engine.score_house_advanced(10),
+        "gains_11th": engine.score_house_advanced(11)
+    }
+    bundle.data["evidence_chains"] = engine.compile_evidence_chains()
+
+    # 4. Dasha, Windows, and Doshas (which depend on house_scores)
     dasha_bundle = build_vimshottari_dasha(
         bundle.moon_longitude,
         bundle.resolved_birth.utc_datetime,
@@ -69,15 +105,20 @@ def _enrich_chart(bundle: ChartBundle) -> None:
         "nadi": {"type": get_nadi_type(bundle)},
         "bhakoot": {"rashi_distance": 1, "compatible": True},
     }
-    bundle.data["navamsa"] = compute_navamsa(bundle)
-    bundle.data["transits"] = compute_transit_snapshot(bundle.lagna_sign_index)
-    bundle.data["yogas"] = detect_yogas(bundle)
 
-    # Ashtakvarga — BAV + SAV tables
-    ashtakvarga = compute_ashtakvarga(bundle)
-    bundle.data["ashtakvarga"] = ashtakvarga
+    # 5. Rule Book Interpretations
+    from backend.services.rule_book_engine import (
+        translate_seshadri_iyer_d9,
+        translate_phaladeepika_livelihood,
+        translate_birth_panchanga,
+    )
+    bundle.data["rule_book_interpretations"] = {
+        "seshadri_iyer_d9": translate_seshadri_iyer_d9(bundle.data),
+        "phaladeepika_livelihood": translate_phaladeepika_livelihood(bundle.data),
+        "birth_panchanga": translate_birth_panchanga(bundle.data),
+    }
 
-    # Enrich transit data with BAV bindus for transit assessment
+    # 6. Enrich transit data with BAV bindus for transit assessment
     for t_key in ("jupiter", "saturn"):
         transit_info = bundle.data["transits"].get(t_key, {})
         t_sign = transit_info.get("sign")

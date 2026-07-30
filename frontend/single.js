@@ -581,6 +581,89 @@ function extractAspectsReceived(aspects, houses) {
 
 // --- Prompt Builders ---
 
+function extractRuleBookInterpretations(chart) {
+  if (!chart.rule_book_interpretations) return "";
+  const r = chart.rule_book_interpretations;
+  
+  const seshadri = Object.entries(r.seshadri_iyer_d9 || {})
+    .map(([p, data]) => `- ${formatLabel(p)} (D9 H${data.d9_house} ${data.d9_sign}): ${data.translation}`)
+    .join("\n");
+    
+  const l = r.phaladeepika_livelihood || {};
+  const scoreStr = l.debug_scores ? ` (Scores: Sun ${l.debug_scores.sun}, Moon ${l.debug_scores.moon}, Lagna Lord ${l.debug_scores.lagna_lord})` : "";
+  const livelihood = `Strongest reference point: ${l.strongest_reference}${scoreStr}
+10th sign from reference: ${l.tenth_sign_from_ref} (Lord: ${l.tenth_lord_from_ref})
+Navamsa occupied by 10th lord: ${l.lord_navamsa_sign}
+Ultimate Livelihood Planet: ${l.ultimate_livelihood_planet}
+Interpretation: ${l.scriptural_translation}`;
+
+  const p = r.birth_panchanga || {};
+  const tithi = p.tithi_ruling ? `- Tithi (${p.tithi_ruling.name}) classification: ${p.tithi_ruling.classification} (deity: ${p.tithi_ruling.governing_deity}). ${p.tithi_ruling.interpretation}` : "";
+  const yoga = p.yoga_ruling ? `- Yoga (${p.yoga_ruling.name}): ${p.yoga_ruling.interpretation} Remedy: ${p.yoga_ruling.remedial_shastra}` : "";
+  const karana = p.karana_ruling ? `- Karana (${p.karana_ruling.name}) classification: ${p.karana_ruling.classification} (deity: ${p.karana_ruling.governing_deity}). ${p.karana_ruling.interpretation}` : "";
+  const nakshatra = p.nakshatra_ruling ? `- Nakshatra Classification (${p.nakshatra_ruling.name}): ${p.nakshatra_ruling.classification}. ${p.nakshatra_ruling.interpretation}` : "";
+  const panchanga = [tithi, yoga, karana, nakshatra].filter(Boolean).join("\n");
+  
+  return `\n\n--- CLASSICAL RULE BOOK ENRICHMENTS (Seshadri Iyer & Phaladeepika & Muhurta Chintamani) ---\n1. Seshadri Iyer D9 Placements:\n${seshadri}\n\n2. Phaladeepika Livelihood (Ch. 5):\n${livelihood}\n\n3. Birth Panchanga (Muhurta Chintamani Ch. 1 & 2):\n${panchanga}`;
+}
+
+function extractAdvancedSynthesis(chart) {
+  let output = "\n\n--- ADVANCED EVIDENCE SYNTHESIS & SCORING ---";
+  
+  if (chart.evidence_chains) {
+    output += "\n1. Resolved Life-Theme Evidence Chains:\n";
+    if (chart.evidence_chains.career) {
+      const c = chart.evidence_chains.career;
+      output += `- Career Theme: ${c.chain}\n  Resolution: ${c.resolution}\n  Confidence: ${c.confidence}%\n`;
+    }
+    if (chart.evidence_chains.personality) {
+      const p = chart.evidence_chains.personality;
+      output += `- Mind & Personality Theme: ${p.chain}\n  Resolution: ${p.resolution}\n  Confidence: ${p.confidence}%\n`;
+    }
+  }
+
+  if (chart.chandra_states) {
+    const cs = chart.chandra_states;
+    output += `\n2. Chandra (Moon) Psychological & Mental States:
+- Chandra Kriya (60 Divisions): Division #${cs.kriya.index} - ${cs.kriya.description}
+- Chandra Avastha (12 Divisions): Division #${cs.avastha.index} - ${cs.avastha.description}
+- Chandra Vela (36 Divisions): Division #${cs.vela.index} - ${cs.vela.description}\n`;
+  }
+
+  if (chart.shodashvarga && chart.shodashvarga.vaiseshikamsa) {
+    output += "\n3. Vaiseshikamsa (Planetary Dignity Consensus across 16 Vargas):\n";
+    Object.entries(chart.shodashvarga.vaiseshikamsa).forEach(([p, data]) => {
+      output += `- ${formatLabel(p)}: ${data.status} (${data.dignity_count}/10 major vargas in own/exalted/friendly signs)\n`;
+    });
+  }
+
+  if (chart.vedhas) {
+    output += "\n4. Gochara (Transit) Aspect Vedhas on Natal Janma Nakshatra:\n";
+    const sap = chart.vedhas.saptashalaka || [];
+    const sarv = chart.vedhas.sarvatobhadra || [];
+    
+    if (sap.length === 0 && sarv.length === 0) {
+      output += "- No transit vedhas active.\n";
+    } else {
+      sap.forEach((v) => {
+        output += `- [Saptashalaka] ${v.planet} in ${v.transit_nakshatra} -> ${v.description}\n`;
+      });
+      sarv.forEach((v) => {
+        output += `- [Sarvatobhadra] ${v.planet} in ${v.transit_nakshatra} -> ${v.description}\n`;
+      });
+    }
+  }
+
+  if (chart.graph_yogas && chart.graph_yogas.length > 0) {
+    output += "\n5. Graph-Isomorphism Pattern Matched Yogas:\n";
+    chart.graph_yogas.forEach((y) => {
+      output += `- ${y.name} (Strength: ${y.strength}): ${y.description}\n`;
+    });
+  }
+
+  return output;
+}
+
 function chartBlock(data) {
   const c = data.chart;
   const yogasStr = (c.yogas || []).map(y => `- ${y.name} (${y.strength}): ${y.description}`).join("\n") || "None";
@@ -614,7 +697,7 @@ Dasha & Timing:
 ${extractDasha(c)}
 
 Current Transits:
-${extractTransits(c)}`;
+${extractTransits(c)}${extractRuleBookInterpretations(c)}${extractAdvancedSynthesis(c)}`;
 }
 
 function buildPersonalityPrompt(data) {
